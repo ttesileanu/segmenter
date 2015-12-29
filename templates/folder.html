@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Choose image</h1>
+<p>(current path: {{ crt_path }})</p>
+<ul class="folderlist">
+{% for folder in contents.folders %}
+<li class="folderitem"><a href="/folder/{{ folder.path }}">{{ folder.name }}</a></li>
+{% endfor %}
+{% for file in contents.files %}
+<li class="fileitem"><a href="/segment/{{ file.path }}">{{ file.name }}</a></li>
+{% endfor %}
+</ul>
+{% endblock %}

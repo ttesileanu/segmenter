@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Image segmenter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css')  }}" />
+  {% block headextra %}{% endblock %}
+</head>
+
+<body {% block bodyoptions %}{% endblock %}>
+  <div id="main">
+    <div id="header">
+      <div id="logo">
+        <div id="logo_text">
+          <h1><a href="/">Image<span class="logo_color">segmenter</span></a></h1>
+          <h2>Segment with ease</h2>
+        </div>
+      </div>
+      <div id="menubar">
+        <ul id="menu">
+          {% set menuitems = [('/', 'Home'), ('/about', 'About')] %}
+          {% for path, text in menuitems %}
+            {% if path == selected_menu %}
+            <li class="selected">
+            {% else %}
+            <li>
+            {% endif %}
+            <a href="{{ path }}">{{ text }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div id="site_content">
+      {% block body %}{% endblock %}
+    </div>
+  </div>
+</body>
+
+</html>
