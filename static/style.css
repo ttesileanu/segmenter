@@ -5,8 +5,8 @@ body
 }
 
 p
-{ padding: 0 0 20px 0;
-  line-height: 1.7em;
+{ padding: 0 0 0.5em 0;
+  line-height: 1.5em;
 }
 
 h1, h2, h3, h4, h5, h6
@@ -16,38 +16,38 @@ h1, h2, h3, h4, h5, h6
 
 h1, h2, h3   /* this overrides previous settings */
 { font: normal 170% 'century gothic', arial;
-  margin: 0 0 15px 0;
+  margin: 0 0 0.5em 0;
 }
 
 h1 {
   font-size: 170%;
   color: #362C20;
-  padding: 0 0 5px 0;
+  padding: 0 0 0.2em 0;
 }
 
 h2 {
   font-size: 160%;
   color: #009FBC;
-  padding: 9px 0 5px 0;
+  padding: 0.5em 0 0.2em 0;
 }
 
 h3
 { font-size: 140%;
   color: #000;
-  padding: 5px 0 0 0;
+  padding: 0.2em 0 0 0;
 }
 
 h4
 { font: normal 110% arial;
   color: #009FBC;
-  padding: 0 0 5px 0;
+  padding: 0 0 0.2em 0;
   text-transform: uppercase;
 }
 
 h5, h6
 { font: normal 95% arial;
   color: #888;
-  padding: 0 0 15px 0;
+  padding: 0 0 0.5em 0;
   letter-spacing: normal;
 }
 
@@ -61,73 +61,73 @@ a:hover
 { text-decoration: none; }
 
 ul
-{ margin: 2px 0 22px 17px; }
+{ margin: 0.1em 0 1em 1em; }
 
 ul li         /* for li's inside of ul's */
 { list-style-type: circle;
-  margin: 0 0 6px 0;
-  padding: 0 0 4px 5px;
+  margin: 0 0 0.3em 0;
+  padding: 0 0 0.3em 0.3em;
   line-height: 1.5em;
 }
 
 ol
-{ margin: 8px 0 22px 20px; }
+{ margin: 0.5em 0 1em 1em; }
 
 ol li
-{ margin: 0 0 1px 0; }
+{ margin: 0 0 0 0; }
 
 .left         /* .class refers to a class; classes can be used several times */
 { float: left;
   width: auto;
-  margin-right: 10px;
+  margin-right: 1em;
 }
 
 .right
 { float: right;
   width: auto;
-  margin-left: 10px;
+  margin-left: 1em;
 }
 
 .center
 { display: block;
   text-align: center;
-  margin: 20px auto;
+  margin: 2em auto;
 }
 
 #main, #logo, #menubar, #site_content, #footer
-/* #id refers to a specific id; there should be only 1 elements with that ID */
+/* #id refers to a specific id; there should be only 1 element with that ID */
 { margin-left: auto;
   margin-right: auto;
 }
 
 #header
 { background: #323534;
-  height: 177px;
+  height: 6.5em;
 }
 
 #logo
 { background: transparent;
-  width: 880px;
-  height: 140px;
+  height: 6em;
   position: relative;
+  margin-left: 10em;
 }
 
 #logo #logo_text
 { position: absolute;
-  top: 10px;
+  top: 0.5em;
   left: 0;
 }
 
 #logo h1, #logo h2
 { font: normal 300% 'century gothic', arial, sans-serif;
-  maring: 0 0 0 9px;
+  margin: 0 0 0 8px;
   border-bottom: 0;
   text-transform: none;
 }
 
 #logo_text h1, #logo_text h1 a, #logo_text h1 a:hover
 { color: #FFF;
-  padding: 22px 0 0 0;
+  padding: 0em 0 0 0;
   letter-spacing: 0.1em;
   text-decoration: none;
 }
@@ -146,8 +146,9 @@ ol li
 }
 
 #menubar
-{ width: 880px;
-  height: 46px;
+{ margin-right: 10em;
+  position: relative;
+  top: -2.5em;
 }
 
 ul#menu   /* ul element with ID menu */
@@ -158,7 +159,7 @@ ul#menu   /* ul element with ID menu */
 ul#menu li
 { float: left;
   background: #5A5A5A;
-  padding: 0 0 0 9px;
+  padding: 0 0 0 1em;
   margin: 1px 2px 0 0;
   list-style: none;
 }
@@ -169,20 +170,14 @@ ul#menu li a
   float: left;
   background: #5A5A5A;
   color: #FFF;
-  padding: 6px 35px 5px 28px;
-  height: 20px;
+  padding: 0.5em 2.5em 0.2em 2em;
+  height: 1.5em;
   text-align: center;
   text-decoration: none;
 }
 
-ul#menu li.selected a
-{ height: 20px;
-  padding: 6px 35px 5px 28px;
-}
-
 ul#menu li.selected
 { background: #00C6F0;
-  margin: 1px 2px 0 0;
 }
 
 ul#menu li.selected a, ul#menu li.selected a:hover
@@ -196,9 +191,9 @@ ul#menu li a:hover
 
 #site_content
 {
-  width: 880px;
-  padding: 0 0 10px 0;
-  margin: 20px auto 0 auto;
+  width: auto;
+  padding: 0 0 1em 0;
+  margin: 1em auto 0 2em;
   overflow: hidden;
 }
 
@@ -229,12 +224,12 @@ ul#menu li a:hover
 }
 
 table
-{ margin: 10px 0 30px 0; }
+{ margin: 1em 0 2em 0; }
 
 table tr th, table tr td
 { background: #3B3B3B;
   color: #FFF;
-  padding: 7px 4px;
+  padding: 0.5em 0.5em;
   text-align: left;
 }
 
@@ -250,7 +245,7 @@ ul.folderlist
 
 ul.folderlist li         /* for li's inside of ul's */
 { list-style-type: none;
-  padding: 0 0 0px 5px;
+  padding: 0 0 0px 0.5em;
   line-height: 1.2em;
 }
 
@@ -269,3 +264,10 @@ ul.folderlist li.fileitem a
 ul.folderlist li.fileitem a:hover
 { color: #888;
  }
+
+#segmenter
+{
+  position: absolute;
+  left: 2em;
+  right: auto;
+}

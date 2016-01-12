@@ -13,13 +13,14 @@ import flask
 app = Flask(__name__)
 
 base_path = os.path.expanduser('~')
+#start_path = os.path.relpath(os.getcwd(), base_path)
+start_path = "Pictures/2014-01-20"
 
 @app.route('/')
-@app.route('/folder/')
 def index():
   return render_template('folder.html', selected_menu='/',
-    contents=getFolderContents(''),
-    crt_path=os.path.realpath(base_path))
+    contents=getFolderContents(start_path),
+    crt_path=os.path.realpath(os.path.join(base_path, start_path)))
 
 @app.route('/about')
 def about():
@@ -27,11 +28,13 @@ def about():
 
 @app.route('/folder/<path:path>')
 def enter_folder(path):
-  if path == '' or path == '.':
-    return index()
   return render_template('folder.html', selected_menu='/',
     contents=getFolderContents(path),
     crt_path=os.path.realpath(os.path.join(base_path, path)))
+
+@app.route('/folder/')
+def base_folder():
+  return enter_folder('')
 
 @app.route('/segment/<path:path>')
 def segment(path):
