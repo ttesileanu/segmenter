@@ -3,9 +3,6 @@
 <canvas id="segmenter">Segmenter canvas</canvas>
 <script src="{{ url_for('static', filename='segmenter.js') }}"></script>
 {% endblock %}
-{% block headextra %}
-<script src="{{ url_for('static', filename='processing.min.js') }}"></script>
-{% endblock %}
 {% block bodyoptions %}
 onload="initSketch('{{ image }}');"
 {% endblock %}
