@@ -21,7 +21,10 @@ function Segmenter(canvas, imageName) {
   this.canvas = canvas;
   this.imageName = imageName;
   this.looping = false;
-  this.mouse = new Vector(0.0, 0.0);
+  this.overlayValid = false;
+  this.drawMode = 'contour';
+  this.brushSize = 25.0;
+  this.mouse = new Vector(0, 0);
 
   //// member functions
   //// setup and flow control
@@ -82,11 +85,17 @@ function Segmenter(canvas, imageName) {
     return new Vector(toDevice(e.clientX - rect.left), toDevice(e.clientY - rect.top));
   }
 
+  this.getImageRectOnWindow = function() {
+    var x0 = canvas.width/2 - this.image.width*this.izoom.s;
+  }
+
   this.isInImage = function(v) {
-    if (!this.iwin) return false;
+    if (!this.izoom) return false;
     // check whether a particular point on the canvas is within the image extents
-    return (v.x >= this.iwin.x && v.y >= this.iwin.y &&
-            v.x < this.iwin.x + this.iwin.w && v.y < this.iwin.y + this.iwin.h);
+    var v1 = this.imageToCanvas(new Vector(0, 0));
+    var v2 = this.imageToCanvas(new Vector(this.image.width, this.image.height));
+    var cwin = this.getCanvasWindow();
+    return (v.x >= cwin[0] && v.y >= cwin[2] && v.x < cwin[1] && v.y < cwin[3]);
   }
 
   this.addPenetrationPoint = function(m0) {
@@ -124,6 +133,15 @@ function Segmenter(canvas, imageName) {
     this.contour.push(p0);
   }
 
+  this.getCanvasWindow = function() {
+    // get the visible image window in canvas coordinates
+    var img = this.getImageWindow()
+    var v1 = this.imageToCanvas(new Vector(img[0], img[2]));
+    var v2 = this.imageToCanvas(new Vector(img[1], img[3]));
+
+    return [v1.x, v2.x, v1.y, v2.y];
+  }
+
   this.getImageWindow = function() {
     // get the visible image window in image coordinates
     var topLeft = this.canvasToImage(new Vector(0.0, 0.0));
@@ -139,14 +157,14 @@ function Segmenter(canvas, imageName) {
 
   this.canvasToImage = function(v) {
     // convert vector from canvas coordinates to image coordinates
-    return new Vector((v.x - this.iwin.x)*this.image.width/ this.iwin.w,
-                      (v.y - this.iwin.y)*this.image.height/this.iwin.h);
+    return new Vector(this.izoom.x - canvas.width/(2*this.izoom.s) + v.x/this.izoom.s,
+                      this.izoom.y - canvas.height/(2*this.izoom.s) + v.y/this.izoom.s);
   }
 
   this.imageToCanvas = function(v) {
     // convert vector from image coordinates to canvas coordinates
-    return new Vector(this.iwin.x + v.x*this.iwin.w/this.image.width,
-                      this.iwin.y + v.y*this.iwin.h/this.image.height);
+    return new Vector(this.izoom.s*(v.x - this.izoom.x) + canvas.width/2,
+                      this.izoom.s*(v.y - this.izoom.y) + canvas.height/2);
   }
 
   //// event handlers
@@ -157,8 +175,9 @@ function Segmenter(canvas, imageName) {
       if (e.ctrlKey) {
         // pinch gesture -- zoom around mouse position
         var center = this.extractMousePosition(e);
+        this.mouse = center;
         if (this.isInImage(center))
-          this.doZoom(Math.exp(e.wheelDelta/2000.0), center);
+          this.doZoom(Math.exp(e.wheelDelta/4000.0), center);
       } else {
         // scroll
         this.doScroll(e.wheelDeltaX, e.wheelDeltaY);
@@ -188,27 +207,81 @@ function Segmenter(canvas, imageName) {
         this.doZoom(-1);
         return false;
       }
+      if (this.drawMode == 'brush') {
+        if (key == '[') {
+          this.brushSize = Math.max(1, this.brushSize - 1);
+          this.updateMouseShape();
+          this.redraw();
+          return false;
+        } else if (key == ']') {
+          this.brushSize = Math.min(200, this.brushSize + 1);
+          this.updateMouseShape();
+          this.redraw();
+          return false;
+        }
+      }
+    }
+  }
+
+  this.onKeyDown = function(e) {
+    // handle arrow keys
+    if (!this.imageLoading && !this.imageError) {
+      var sx = 0;
+      var sy = 0;
+      var amt = 25;
+
+      if (e.keyCode == 37) {        // left
+        sx = 1.0;
+      } else if (e.keyCode == 39) { // right
+        sx = -1.0;
+      } else if (e.keyCode == 38) { // up
+        sy = 1.0;
+      } else if (e.keyCode == 40) { // down
+        sy = -1.0;
+      }
+      if (sx != 0 || sy != 0) {
+        this.doScroll(sx*amt, sy*amt);
+        return false;
+      }
     }
   }
 
   this.onMouseDown = function(e) {
     // start creating contour
     if (e.button == 0) { // left click
-      // start a new contour
-      var m = this.extractMousePosition(e);
-      if (this.isInImage(m)) {
-        this.makingContour = true;
-        this.draggingOutside = false;
-        this.contour = [this.canvasToImage(m)];
-        this.redraw();
-        return false;
+      if (this.drawMode == 'contour') {
+        // start a new contour
+        var m = this.extractMousePosition(e);
+        this.mouse = m;
+        if (this.isInImage(m)) {
+          this.makingContour = true;
+          this.draggingOutside = false;
+          this.contour = [this.canvasToImage(m)];
+          this.redraw();
+          return false;
+        }
       }
+    }
+  }
+
+  this.updateMouseShape = function(m) {
+    if (m === undefined) m = this.mouse;
+    // update mouse shape based on its position
+    if (this.isInImage(m)) {
+      if (this.drawMode == 'brush') {
+        canvas.style.cursor = 'none';
+      } else {
+        canvas.style.cursor = 'crosshair';
+      }
+    } else {
+      canvas.style.cursor = 'auto';
     }
   }
 
   this.onMouseMoved = function(e) {
     // contour making or simply changing pointer shape
     var m = this.extractMousePosition(e);
+    this.mouse = m;
     if (this.makingContour) {
       if (this.isInImage(m)) {
         // if it was outside, then we need to handle the entry point
@@ -224,23 +297,15 @@ function Segmenter(canvas, imageName) {
       }
       this.redraw();
     } else {
-      if (this.isInImage(m)) {
-        canvas.style.cursor = 'crosshair';
-      } else {
-        canvas.style.cursor = 'auto';
-      }
+      this.updateMouseShape(m);
     }
+    if (this.drawMode == 'brush')
+      this.redraw();
   }
 
   this.onMouseUp = function(e) {
     if (this.makingContour) {
-      this.makingContour = false;
-      if (this.contour.length > 1)
-        this.contour.push(this.contour[0]);
-      else
-        this.contour = [];
-
-      this.redraw();
+      this.finishContour();
     }
   }
 
@@ -266,7 +331,9 @@ function Segmenter(canvas, imageName) {
     // mouse has gone outside image and/or canvas area
     if (!this.draggingOutside) {
       var m = this.extractMousePosition(e);
-      this.addPenetrationPoint(m);
+      this.mouse = m;
+      if (this.drawMode == 'contour')
+        this.addPenetrationPoint(m);
       this.draggingOutside = true;
     }
   }
@@ -274,8 +341,10 @@ function Segmenter(canvas, imageName) {
   this.hoverOverImage = function(e) {
     // mouse has returned inside image and/or canvas area
     var m = this.extractMousePosition(e);
+    this.mouse = m;
     if (this.isInImage(m)) {
-      this.addPenetrationPoint(m);
+      if (this.drawMode == 'contour')
+        this.addPenetrationPoint(m);
       this.draggingOutside = false;
     }
   }
@@ -310,6 +379,22 @@ function Segmenter(canvas, imageName) {
     this.drawImage(ctx);
 
     if (this.contour && this.contour.length > 0) this.drawContour(ctx);
+
+    if (this.drawMode == 'brush') {
+      var imgSize = this.brushSize*this.izoom.s;
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#FFF';
+      ctx.lineWidth = 3;
+      ctx.arc(this.mouse.x, this.mouse.y, imgSize/2, 0, 2*Math.PI);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.arc(this.mouse.x, this.mouse.y, imgSize/2, 0, 2*Math.PI);
+      ctx.stroke();
+    }
 
     this.noLoop();
   }
@@ -376,24 +461,96 @@ function Segmenter(canvas, imageName) {
   }
 
   this.setInitialWindow = function() {
+    // initially the whole image is visible
+
     // setup the initial image size + position
     var scale = Math.min(canvas.width/this.image.width, canvas.height/this.image.height);
+    this.defaultScale = scale;
 
-    this.iwin = {};
-    this.iwin.w = this.image.width*scale;
-    this.iwin.h = this.image.height*scale;
+    this.izoom = {};
+    this.izoom.x = this.image.width/2;
+    this.izoom.y = this.image.height/2;
+    this.izoom.s = scale;
+  }
 
-    this.iwin.x = (canvas.width - this.iwin.w)/2;
-    this.iwin.y = (canvas.height - this.iwin.h)/2;
+  this.createMipmaps = function(img, n) {
+    // create n mipmaps of the original image (scales 2^0, 2^1, ..., 2^{n-1})
+    images = [];
+    var i;
+    var crt_w = img.width;
+    var crt_h = img.height;
+    for (i = 0; i < n; ++i) {
+      // XXX might be most efficient to downsample from the smallest available
+      // image instead of always using the fullsize one; though that might also
+      // introduce more errors
+      var crt_w_i = Math.round(crt_w);
+      var crt_h_i = Math.round(crt_h);
+      images.push(this.scaleCropImage(img, 0, 0, img.width, img.height, crt_w_i, crt_h_i));
+      crt_w /= 2;
+      crt_h /= 2;
+    }
+
+    return images;
   }
 
   this.drawImage = function(ctx) {
-    // draw the image on canvas
-    ctx.drawImage(this.image, this.iwin.x, this.iwin.y, this.iwin.w, this.iwin.h);
+    // make sure overlay is up-to-date
+    this.updateOverlay();
 
-    // overlay the segmentation buffer
-/*    ctx.drawImage(this.segmentation, 0, 0, this.iwin.w, this.iwin.h,
-                  this.iwin.x, this.iwin.y, this.iwin.w, this.iwin.h);*/
+    // draw the image+segmentation overlay on canvas
+    var canvasWindow = this.getCanvasWindow();
+    var imageWindow = this.getImageWindow();
+    var mipIdx = Math.max(0, Math.floor(-Math.log(this.izoom.s)/Math.LN2));
+    var mipFactor = Math.pow(2, mipIdx);
+
+    ctx.drawImage(this.overlay_mipmaps[mipIdx],
+                  imageWindow[0]/mipFactor, imageWindow[2]/mipFactor,
+                  (imageWindow[1] - imageWindow[0])/mipFactor, (imageWindow[3] - imageWindow[2])/mipFactor,
+                  canvasWindow[0], canvasWindow[2],
+                  canvasWindow[1] - canvasWindow[0], canvasWindow[3] - canvasWindow[2]);
+  }
+
+  this.scaleCropImage = function(img, sx, sy, sw, sh, w, h) {
+    // scale and crop image onto a canvas
+    // if sx, sy, sw, and sh are provided, a crop is made
+    // if w and h are provided, the image is rescaled
+    sx = sx || 0;
+    sy = sy || 0;
+    sw = Math.floor(sw) || img.width;
+    sh = Math.floor(sh) || img.height;
+
+    w = Math.floor(w) || img.width;
+    h = Math.floor(h) || img.height;
+
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = w;
+    tempCanvas.height = h;
+    
+    var tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+
+    return tempCanvas;
+  }
+
+  this.updateOverlay = function() {
+    // update the overlay of image+segmentation
+    if (!this.overlayValid) {
+      
+      this.overlay = this.scaleCropImage(this.image);
+
+      var ctx = this.overlay.getContext("2d");
+      ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(this.segmentation, 0, 0);
+
+      this.overlay_mipmaps = this.createMipmaps(this.overlay, 8);
+
+      this.overlayValid = true;
+    }
+  }
+
+  this.invalidateOverlay = function() {
+    // mark the overlay data as invalid
+    this.overlayValid = false;
   }
 
   this.drawContour = function(ctx) {
@@ -423,45 +580,47 @@ function Segmenter(canvas, imageName) {
     if (center === undefined)
       center = new Vector(canvas.width/2, canvas.height/2);
 
+    var old_s = this.izoom.s;
     if (factor >= 0) {
-      this.iwin.x += (1 - factor)*(center.x - this.iwin.x);
-      this.iwin.y += (1 - factor)*(center.y - this.iwin.y);
-
-      this.iwin.w *= factor;
-      this.iwin.h *= factor;
+      this.izoom.s *= factor;
     } else {
       // zoom in fully
-      var img_cx = (center.x - this.iwin.x)*this.image.width/ this.iwin.w;
-      var img_cy = (center.y - this.iwin.y)*this.image.height/this.iwin.h;
-
-      this.iwin.w = this.image.width;
-      this.iwin.h = this.image.height;
-
-      this.iwin.x = canvas.width/2.0  - img_cx;
-      this.iwin.y = canvas.height/2.0 - img_cy;
+      this.izoom.s = 1;
     }
+
+    // limit zooming range
+    var max_zoom = 4.0;
+    var min_zoom = this.defaultScale || 0.001;
+    this.izoom.s = Math.min(Math.max(this.izoom.s, min_zoom), max_zoom);
+
+    var img_center = this.canvasToImage(center);
+    var ratio = old_s/this.izoom.s;
+    this.izoom.x = this.izoom.x*ratio + (1 - ratio)*img_center.x;
+    this.izoom.y = this.izoom.y*ratio + (1 - ratio)*img_center.y;
 
     // if we're zooming out, make sure to move the image to maximize
     // canvas use
     if (factor < 1)
       this.fixPosition();
 
+    this.updateMouseShape(center);
     this.redraw();
   }
 
   this.doScroll = function(sx, sy) {
     // scroll by (sx, sy)
     var changed = false;
-    if (this.iwin.w > canvas.width) {
-      this.iwin.x += sx;
+    if (this.image.width*this.izoom.s > canvas.width) {
+      this.izoom.x -= sx/this.izoom.s;
       changed = true;
     }
-    if (this.iwin.h > canvas.height) {
-      this.iwin.y += sy;
+    if (this.image.height*this.izoom.s > canvas.height) {
+      this.izoom.y -= sy/this.izoom.s;
       changed = true;
     }
     if (changed) {
       this.fixPosition();
+      this.updateMouseShape();
       this.redraw();
     }
   }
@@ -471,17 +630,27 @@ function Segmenter(canvas, imageName) {
     var fw = canvas.width;
     var fh = canvas.height;
 
-    if (this.iwin.w > canvas.width) {
-      if (this.iwin.x + this.iwin.w < canvas.width) {
-        this.iwin.x = canvas.width - this.iwin.w;
+    var v1 = this.imageToCanvas(new Vector(0, 0));
+    var v2 = this.imageToCanvas(new Vector(this.image.width, this.image.height));
+    if (this.image.width*this.izoom.s > canvas.width) {
+      if (v2.x < canvas.width) {
+        this.izoom.x -= (canvas.width - v2.x)/this.izoom.s;
       }
-      if (this.iwin.x > 0) this.iwin.x = 0;
+      if (v1.x > 0) {
+        this.izoom.x += v1.x/this.izoom.s;
+      }
+    } else {
+      this.izoom.x = this.image.width/2;
     }
-    if (this.iwin.h > canvas.height) {
-      if (this.iwin.y + this.iwin.h < canvas.height) {
-        this.iwin.y = canvas.height - this.iwin.h;
+    if (this.image.height*this.izoom.s > canvas.height) {
+      if (v2.y < canvas.height) {
+        this.izoom.y -= (canvas.height - v2.y)/this.izoom.s;
       }
-      if (this.iwin.y > 0) this.iwin.y = 0;
+      if (v1.y > 0) {
+        this.izoom.y += v1.y/this.izoom.s;
+      }
+    } else {
+      this.izoom.y = this.image.height/2;
     }
   }
 
@@ -491,6 +660,62 @@ function Segmenter(canvas, imageName) {
     this.segmentation = document.createElement('canvas');
     this.segmentation.width = this.image.width;
     this.segmentation.height = this.image.height;
+  }
+
+  this.fillContour = function(ctx, contour, style) {
+    // fill the contour on the given context with the given style
+    // figure out the vertical bounds of the contour
+    var min_y = contour[0].y;
+    var max_y = min_y;
+
+    var i;
+    for (i = 1; i < contour.length; ++i) {
+      if (contour[i].y < min_y) min_y = contour[i].y;
+      if (contour[i].y > max_y) max_y = contour[i].y;
+    }
+
+    // round these to integers
+    min_y = Math.floor(min_y);
+    max_y = Math.ceil(max_y);
+
+    // start filling
+    ctx.fillStyle = style;
+    var y;
+    for (y = min_y; y <= max_y; ++y) {
+      // find all the intersection of the scanline with the polygon edges
+      var inters = [];
+      var j = contour.length - 1;
+      var vi, vj = contour[j];
+      for (i = 0; i < contour.length; ++i) {
+        vi = contour[i];
+        if (vi.y < y && vj.y >= y || vj.y < y && vi.y >= y)
+          inters.push(vi.x + (y - vi.y)*(vj.x - vi.x)/(vj.y - vi.y));
+        j = i;
+        vj = vi;
+      }
+
+      // need these sorted
+      inters.sort(function(a, b) { return a - b; });
+
+      // and now fill the interior, using an even/odd strategy
+      for (i = 0; i < inters.length; i += 2) {
+        ctx.fillRect(inters[i], y, inters[i+1]-inters[i], 1);
+      }
+    }
+  }
+
+  this.finishContour = function() {
+    this.makingContour = false;
+    if (this.contour.length > 1) {
+      var style = "#FF0000";
+      this.fillContour(this.segmentation.getContext("2d"), this.contour, style);
+    }
+
+    this.contour = [];
+    this.drawMode = 'brush';
+    this.updateMouseShape();
+    this.invalidateOverlay();
+    this.redraw();
   }
 
   //// initialization
@@ -508,10 +733,9 @@ function Segmenter(canvas, imageName) {
   // set up event handlers
   var s = this;
   // canvases can't have keyboard focus, so setting listener on document instead
-  document.addEventListener("keypress",
-    function(e) {
-      return s.onKeyPress(e);
-    }, false);
+  document.addEventListener("keypress", function(e) { return s.onKeyPress(e); }, false);
+  document.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
+
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("mousedown", function(e) { return s.onMouseDown(e); }, false);
   canvas.addEventListener("mouseup", function(e) { return s.onMouseUp(e); }, false);
