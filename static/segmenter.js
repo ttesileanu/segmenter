@@ -15,6 +15,31 @@ function Vector(x, y) {
   this.y = y;
 }
 
+function vadd(v1, v2) {
+  // add two vectors
+  return new Vector(v1.x + v2.x, v1.y + v2.y);
+}
+
+function vsub(v1, v2) {
+  // subtract two vectors
+  return new Vector(v1.x - v2.x, v1.y - v2.y);
+}
+
+function vscale(a, v) {
+  // multiply vector by scalar
+    return new Vector(a*v.x, a*v.y);
+}
+
+function vnorm2(v) {
+  // calculate norm-squared of vector
+  return v.x*v.x + v.y*v.y;
+}
+
+function vnorm(v) {
+  // calculate norm of vector
+  return Math.sqrt(vnorm2(v));
+}
+
 //// The Segmenter class
 function Segmenter(canvas, imageName) {
   //// attributes
@@ -24,7 +49,11 @@ function Segmenter(canvas, imageName) {
   this.overlayValid = false;
   this.drawMode = 'contour';
   this.brushSize = 25.0;
+  this.oldMouse = new Vector(0, 0);
   this.mouse = new Vector(0, 0);
+  this.currentColor = "#FF0000";
+  this.painting = false;
+  this.invalidateAt = undefined;
 
   //// member functions
   //// setup and flow control
@@ -79,6 +108,11 @@ function Segmenter(canvas, imageName) {
   }
 
   //// convenience functions
+  this.setMouse = function(m) {
+    this.oldMouse = this.mouse;
+    this.mouse = m;
+  }
+
   this.extractMousePosition = function(e) {
     // extract mouse position from event
     var rect = canvas.getBoundingClientRect();
@@ -175,7 +209,7 @@ function Segmenter(canvas, imageName) {
       if (e.ctrlKey) {
         // pinch gesture -- zoom around mouse position
         var center = this.extractMousePosition(e);
-        this.mouse = center;
+        this.setMouse(center);
         if (this.isInImage(center))
           this.doZoom(Math.exp(e.wheelDelta/4000.0), center);
       } else {
@@ -243,16 +277,17 @@ function Segmenter(canvas, imageName) {
         this.doScroll(sx*amt, sy*amt);
         return false;
       }
+      this.painting = false;
     }
   }
 
   this.onMouseDown = function(e) {
+    var m = this.extractMousePosition(e);
+    this.setMouse(m);
     // start creating contour
     if (e.button == 0) { // left click
       if (this.drawMode == 'contour') {
         // start a new contour
-        var m = this.extractMousePosition(e);
-        this.mouse = m;
         if (this.isInImage(m)) {
           this.makingContour = true;
           this.draggingOutside = false;
@@ -260,6 +295,12 @@ function Segmenter(canvas, imageName) {
           this.redraw();
           return false;
         }
+      } else if (this.drawMode == 'brush') {
+        // start painting
+        this.painting = true;
+        var v = this.canvasToImage(this.mouse);
+        this.brushPaint(v, v);
+        this.redraw();
       }
     }
   }
@@ -281,7 +322,7 @@ function Segmenter(canvas, imageName) {
   this.onMouseMoved = function(e) {
     // contour making or simply changing pointer shape
     var m = this.extractMousePosition(e);
-    this.mouse = m;
+    this.setMouse(m);
     if (this.makingContour) {
       if (this.isInImage(m)) {
         // if it was outside, then we need to handle the entry point
@@ -299,13 +340,22 @@ function Segmenter(canvas, imageName) {
     } else {
       this.updateMouseShape(m);
     }
-    if (this.drawMode == 'brush')
+    if (this.drawMode == 'brush') {
+      if (this.painting)
+        this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse));
       this.redraw();
+    }
   }
 
   this.onMouseUp = function(e) {
+    var m = this.extractMousePosition(e);
+    this.setMouse(m);
     if (this.makingContour) {
       this.finishContour();
+    } else if (this.painting) {
+      this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse));
+      this.painting = false;
+      this.redraw();
     }
   }
 
@@ -315,6 +365,8 @@ function Segmenter(canvas, imageName) {
       // handle the exit point
       this.hoverOutImage(e);
       this.redraw();
+    } else if (this.painting) {
+      this.painting = false;
     }
   }
 
@@ -331,17 +383,19 @@ function Segmenter(canvas, imageName) {
     // mouse has gone outside image and/or canvas area
     if (!this.draggingOutside) {
       var m = this.extractMousePosition(e);
-      this.mouse = m;
+      this.setMouse(m);
       if (this.drawMode == 'contour')
         this.addPenetrationPoint(m);
       this.draggingOutside = true;
     }
+    if (this.painting)
+      this.painting = false;
   }
 
   this.hoverOverImage = function(e) {
     // mouse has returned inside image and/or canvas area
     var m = this.extractMousePosition(e);
-    this.mouse = m;
+    this.setMouse(m);
     if (this.isInImage(m)) {
       if (this.drawMode == 'contour')
         this.addPenetrationPoint(m);
@@ -501,13 +555,19 @@ function Segmenter(canvas, imageName) {
     var canvasWindow = this.getCanvasWindow();
     var imageWindow = this.getImageWindow();
     var mipIdx = Math.max(0, Math.floor(-Math.log(this.izoom.s)/Math.LN2));
+    mipIdx = Math.min(this.overlay_mipmaps.length-1, mipIdx);
     var mipFactor = Math.pow(2, mipIdx);
 
-    ctx.drawImage(this.overlay_mipmaps[mipIdx],
-                  imageWindow[0]/mipFactor, imageWindow[2]/mipFactor,
-                  (imageWindow[1] - imageWindow[0])/mipFactor, (imageWindow[3] - imageWindow[2])/mipFactor,
-                  canvasWindow[0], canvasWindow[2],
-                  canvasWindow[1] - canvasWindow[0], canvasWindow[3] - canvasWindow[2]);
+    var sx = Math.floor(imageWindow[0]/mipFactor);
+    var sy = Math.floor(imageWindow[2]/mipFactor);
+    var sw = (imageWindow[1] - imageWindow[0])/mipFactor;
+    var sh = (imageWindow[3] - imageWindow[2])/mipFactor;
+
+    var x = canvasWindow[0];
+    var y = canvasWindow[2];
+    var w = canvasWindow[1] - canvasWindow[0];
+    var h = canvasWindow[3] - canvasWindow[2];
+    ctx.drawImage(this.overlay_mipmaps[mipIdx], sx, sy, sw, sh, x, y, w, h);
   }
 
   this.scaleCropImage = function(img, sx, sy, sw, sh, w, h) {
@@ -534,8 +594,13 @@ function Segmenter(canvas, imageName) {
 
   this.updateOverlay = function() {
     // update the overlay of image+segmentation
+    if (this.overlayValid && this.invalidateAt !== undefined) {
+      var date = new Date();
+      if (date.getTime() >= this.invalidateAt) {
+        this.invalidateOverlay();
+      }
+    }
     if (!this.overlayValid) {
-      
       this.overlay = this.scaleCropImage(this.image);
 
       var ctx = this.overlay.getContext("2d");
@@ -548,9 +613,29 @@ function Segmenter(canvas, imageName) {
     }
   }
 
-  this.invalidateOverlay = function() {
-    // mark the overlay data as invalid
-    this.overlayValid = false;
+  this.invalidateOverlay = function(t) {
+    // mark the overlay data as invalid, or force it to invalidate a time t (milliseconds) in the future
+    t = t || 0;
+    if (t == 0) {
+      this.overlayValid = false;
+      this.invalidateAt = undefined;
+    } else {
+      if (this.invalidateAt === undefined) {
+        var date = new Date();
+        this.invalidateAt = date.getTime() + t;
+        
+        var s = this;
+        setTimeout(
+            function() {
+              if (s.invalidateAt !== undefined) {
+                s.invalidateOverlay();
+                s.redraw();
+                s.invalidateAt = undefined;
+              }
+            },
+          t);
+      }
+    }
   }
 
   this.drawContour = function(ctx) {
@@ -660,6 +745,13 @@ function Segmenter(canvas, imageName) {
     this.segmentation = document.createElement('canvas');
     this.segmentation.width = this.image.width;
     this.segmentation.height = this.image.height;
+
+    var ctx = this.segmentation.getContext("2d");
+
+    // clear everything
+    // this may be unnecessary...
+    ctx.fillStyle = "rgba(0, 0, 0, 0)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   this.fillContour = function(ctx, contour, style) {
@@ -705,10 +797,10 @@ function Segmenter(canvas, imageName) {
   }
 
   this.finishContour = function() {
+    // finish the contour, add it to the segmentation
     this.makingContour = false;
     if (this.contour.length > 1) {
-      var style = "#FF0000";
-      this.fillContour(this.segmentation.getContext("2d"), this.contour, style);
+      this.fillContour(this.segmentation.getContext("2d"), this.contour, this.currentColor);
     }
 
     this.contour = [];
@@ -716,6 +808,47 @@ function Segmenter(canvas, imageName) {
     this.updateMouseShape();
     this.invalidateOverlay();
     this.redraw();
+  }
+
+  this.brushPaint = function(v1, v2) {
+    // make a line with the brush from v1 to v2
+
+    // do this by making a contour and use fillContour, to avoid any antialiasing trouble
+    var contour = [];
+
+    // work in a coordinate system based on the line from v1 to v2
+    var diff = vsub(v2, v1);
+    if (vnorm2(diff) < 1e-4) {
+      var vi = new Vector(1, 0);
+      var vj = new Vector(0, 1);
+    } else {
+      var vi = vscale(1.0/vnorm(diff), diff);
+      var vj = new Vector(vi.y, -vi.x);
+    }
+
+    // number of segments for each half circle
+    var nseg = Math.floor(this.brushSize);
+
+    // draw half circle around starting point
+    var R = this.brushSize/2;
+    var i;
+    for (i = 0; i < nseg; ++i) {
+      var angle = i*Math.PI/nseg;
+      var vr = vadd(vscale(-R*Math.sin(angle), vi), vscale(R*Math.cos(angle), vj));
+      contour.push(vadd(v1, vr));
+    }
+
+    // draw half circle around ending point
+    for (i = 0; i < nseg; ++i) {
+      var angle = i*Math.PI/nseg;
+      var vr = vadd(vscale(R*Math.sin(angle), vi), vscale(-R*Math.cos(angle), vj));
+      contour.push(vadd(v2, vr));
+    }
+
+    this.fillContour(this.segmentation.getContext("2d"), contour, this.currentColor);
+
+    // need to recalculate the overlay, but we don't want to slow things down by doing it too often
+    this.invalidateOverlay(50);
   }
 
   //// initialization
