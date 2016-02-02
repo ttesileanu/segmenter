@@ -40,6 +40,45 @@ function vnorm(v) {
   return Math.sqrt(vnorm2(v));
 }
 
+function toggleButton(btn, state) {
+  // toggle the button or set button
+  if (state === undefined) {
+    btn.classList.toggle('down');
+  } else if (state) {
+    btn.classList.add('down');
+  } else {
+    btn.classList.remove('down');
+  }
+}
+
+function registerToolById(btnid, props) {
+  // register a tool button by id
+  btn = document.getElementById(btnid);
+  toolbox[btnid] = btn;
+  toolprops[btnid] = props || {};
+  btn.addEventListener("click", function() { selectTool(this); });
+}
+
+function selectTool(btn) {
+  // select a tool
+  for (other in toolbox) {
+    if (toolbox.hasOwnProperty(other))
+      toggleButton(toolbox[other], false);
+  }
+
+  toggleButton(btn, true);
+
+  if (instance) {
+    if (btn.id == 'brushbtn') {
+      instance.selectMode('brush');
+    } else if (btn.id == 'erasebtn') {
+      instance.selectMode('eraser');
+    } else {
+      instance.selectMode('contour');
+    }
+  }
+}
+
 //// The Segmenter class
 function Segmenter(canvas, imageName) {
   //// attributes
@@ -49,6 +88,8 @@ function Segmenter(canvas, imageName) {
   this.overlayValid = false;
   this.drawMode = 'contour';
   this.brushSize = 25.0;
+  this.minBrush = 1;
+  this.maxBrush = 200;
   this.oldMouse = new Vector(0, 0);
   this.mouse = new Vector(0, 0);
   this.currentColor = "#FF0000";
@@ -74,6 +115,20 @@ function Segmenter(canvas, imageName) {
       };
 
     this.image.src = this.imageName;
+
+    // register tools
+    registerToolById('brushbtn', {
+        'sizeslider': document.getElementById('brushslider'),
+        'sizevalue': document.getElementById('brushsize'),
+        'span': document.getElementById('brushctrl')
+      });
+    registerToolById('erasebtn', {
+        'sizeslider': document.getElementById('brushslider'),
+        'sizevalue': document.getElementById('brushsize'),
+        'span': document.getElementById('brushctrl')
+      });
+    registerToolById('polybtn');
+    selectTool(toolbox['polybtn']);
 
     // start a loop waiting for the image to load
     this.loop();
@@ -241,16 +296,14 @@ function Segmenter(canvas, imageName) {
         this.doZoom(-1);
         return false;
       }
-      if (this.drawMode == 'brush') {
+      if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
         if (key == '[') {
-          this.brushSize = Math.max(1, this.brushSize - 1);
+          this.setBrushSize(this.brushSize - 1);
           this.updateMouseShape();
-          this.redraw();
           return false;
         } else if (key == ']') {
-          this.brushSize = Math.min(200, this.brushSize + 1);
+          this.setBrushSize(this.brushSize + 1);
           this.updateMouseShape();
-          this.redraw();
           return false;
         }
       }
@@ -282,6 +335,11 @@ function Segmenter(canvas, imageName) {
   }
 
   this.onMouseDown = function(e) {
+    if (document.activeElement != canvas) {
+      canvas.focus();
+      return;
+    }
+
     var m = this.extractMousePosition(e);
     this.setMouse(m);
     // start creating contour
@@ -295,11 +353,11 @@ function Segmenter(canvas, imageName) {
           this.redraw();
           return false;
         }
-      } else if (this.drawMode == 'brush') {
+      } else if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
         // start painting
         this.painting = true;
         var v = this.canvasToImage(this.mouse);
-        this.brushPaint(v, v);
+        this.brushPaint(v, v, this.drawMode == 'eraser');
         this.redraw();
       }
     }
@@ -309,7 +367,7 @@ function Segmenter(canvas, imageName) {
     if (m === undefined) m = this.mouse;
     // update mouse shape based on its position
     if (this.isInImage(m)) {
-      if (this.drawMode == 'brush') {
+      if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
         canvas.style.cursor = 'none';
       } else {
         canvas.style.cursor = 'crosshair';
@@ -340,9 +398,10 @@ function Segmenter(canvas, imageName) {
     } else {
       this.updateMouseShape(m);
     }
-    if (this.drawMode == 'brush') {
+    if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
       if (this.painting)
-        this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse));
+        this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
+                        this.drawMode == 'eraser');
       this.redraw();
     }
   }
@@ -353,7 +412,8 @@ function Segmenter(canvas, imageName) {
     if (this.makingContour) {
       this.finishContour();
     } else if (this.painting) {
-      this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse));
+      this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
+                      this.drawMode == 'eraser');
       this.painting = false;
       this.redraw();
     }
@@ -434,7 +494,7 @@ function Segmenter(canvas, imageName) {
 
     if (this.contour && this.contour.length > 0) this.drawContour(ctx);
 
-    if (this.drawMode == 'brush') {
+    if ((this.drawMode == 'brush' || this.drawMode == 'eraser') && this.isInImage(this.mouse)) {
       var imgSize = this.brushSize*this.izoom.s;
 
       ctx.beginPath();
@@ -771,7 +831,8 @@ function Segmenter(canvas, imageName) {
     max_y = Math.ceil(max_y);
 
     // start filling
-    ctx.fillStyle = style;
+    if (style != 'erase')
+      ctx.fillStyle = style;
     var y;
     for (y = min_y; y <= max_y; ++y) {
       // find all the intersection of the scanline with the polygon edges
@@ -791,7 +852,10 @@ function Segmenter(canvas, imageName) {
 
       // and now fill the interior, using an even/odd strategy
       for (i = 0; i < inters.length; i += 2) {
-        ctx.fillRect(inters[i], y, inters[i+1]-inters[i], 1);
+        if (style == 'erase')
+          ctx.clearRect(inters[i], y, inters[i+1]-inters[i], 1);
+        else
+          ctx.fillRect(inters[i], y, inters[i+1]-inters[i], 1);
       }
     }
   }
@@ -804,14 +868,14 @@ function Segmenter(canvas, imageName) {
     }
 
     this.contour = [];
-    this.drawMode = 'brush';
-    this.updateMouseShape();
     this.invalidateOverlay();
     this.redraw();
   }
 
-  this.brushPaint = function(v1, v2) {
+  this.brushPaint = function(v1, v2, erase) {
     // make a line with the brush from v1 to v2
+
+    erase = erase || false;
 
     // do this by making a contour and use fillContour, to avoid any antialiasing trouble
     var contour = [];
@@ -845,15 +909,60 @@ function Segmenter(canvas, imageName) {
       contour.push(vadd(v2, vr));
     }
 
-    this.fillContour(this.segmentation.getContext("2d"), contour, this.currentColor);
+    this.fillContour(this.segmentation.getContext("2d"), contour, erase?'erase':this.currentColor);
 
     // need to recalculate the overlay, but we don't want to slow things down by doing it too often
     this.invalidateOverlay(50);
   }
 
+  this.selectMode = function(mode) {
+    if (this.drawMode != mode) {
+      this.drawMode = mode;
+      this.contour = [];
+
+      if (mode == 'brush' || mode == 'eraser') {
+        // the size slider is the same for the brush and the eraser
+        toolprops['brushbtn']['span'].style.visibility = 'visible';
+        var slider = toolprops['brushbtn']['sizeslider'];
+        var value = toolprops['brushbtn']['sizevalue'];
+        var s = this;
+        slider.addEventListener('change', function() {
+            s.setBrushSize(slider.value);
+          });
+        value.addEventListener('change', function() {
+            s.setBrushSize(value.value);
+          });
+
+        slider.min = this.minBrush;
+        slider.max = this.maxBrush;
+        this.setBrushSize(this.brushSize);
+      } else {
+        toolprops['brushbtn']['span'].style.visibility = 'hidden';
+      }
+
+      this.updateMouseShape();
+      this.redraw();
+    }
+  }
+
+  this.setBrushSize = function(size) { 
+    this.brushSize = Math.max(this.minBrush, Math.min(this.maxBrush, size));
+    this.redraw();
+
+    var slider = toolprops['brushbtn']['sizeslider'];
+    var value = toolprops['brushbtn']['sizevalue'];
+    slider.value = this.brushSize;
+    value.value = slider.value;
+  }
+
   //// initialization
   // set the size of the segmenter on screen
-  var px_width = 900, px_height = 500;
+  var px_width = 900;
+  var px_height = 5*px_width/9;
+
+  document.getElementById("segmenterdiv").style.width = px_width + "px";
+  document.getElementById("segmenterctrl").style.left = px_width + "px";
+  
   var dev_width = toDevice(px_width), dev_height = toDevice(px_height);
 
   canvas.width = dev_width;
@@ -866,8 +975,11 @@ function Segmenter(canvas, imageName) {
   // set up event handlers
   var s = this;
   // canvases can't have keyboard focus, so setting listener on document instead
-  document.addEventListener("keypress", function(e) { return s.onKeyPress(e); }, false);
-  document.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
+  canvas.setAttribute('tabindex', 0);
+  canvas.focus();
+  var keyCollector = canvas;
+  keyCollector.addEventListener("keypress", function(e) { return s.onKeyPress(e); }, false);
+  keyCollector.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
 
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("mousedown", function(e) { return s.onMouseDown(e); }, false);
@@ -889,4 +1001,7 @@ function initSketch(imgName) {
 }
 
 //// global variables
+var instance;
 var canvas = document.getElementById("segmenter");
+var toolbox = {};
+var toolprops = {};

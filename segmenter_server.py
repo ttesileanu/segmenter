@@ -39,7 +39,7 @@ def base_folder():
 @app.route('/segment/<path:path>')
 def segment(path):
   return render_template('action.html', selected_menu='/',
-      image="/serveimage/" + path)
+      image="/serveimage/" + path, image_name=os.path.basename(path))
 
 @app.route('/serveimage/<path:path>')
 def serve_image(path):

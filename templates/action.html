@@ -1,7 +1,31 @@
 {% extends "base.html" %}
 {% block body %}
-<canvas id="segmenter">Segmenter canvas</canvas>
-<script src="{{ url_for('static', filename='segmenter.js') }}"></script>
+<h3>{{ image_name }}</h3>
+<div id="segmenterapp">
+  <div id="segmenterdiv">
+    <canvas id="segmenter">Segmenter canvas</canvas>
+  </div>
+  <div id="segmenterctrl">
+    <a class="segtool" id="polybtn"></a>
+    <a class="segtool" id="brushbtn"></a>
+    <a class="segtool" id="erasebtn"></a>
+    <span id="brushctrl" style="visibility: hidden;" />
+      <label for="brushslider" id="brushlabel">size</label>
+      <input id="brushslider" type="range" />
+      <input id="brushsize" type="text" />
+    </span>
+    <div id="taglistdiv">
+      <ul class="taglist">
+        <li class="taglist" id="tag1">
+          <input class="tag" id="tagname1" type="text" value="foreground" />
+          <span class="colorswatch" style="background-color: #FF0000;"></span>
+        </li>
+      </ul>
+      <button id="plustag"></button>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='segmenter.js') }}"></script>
+</div>
 {% endblock %}
 {% block bodyoptions %}
 onload="initSketch('{{ image }}');"

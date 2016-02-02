@@ -107,7 +107,7 @@ ol li
 
 #logo
 { background: transparent;
-  height: 6em;
+  height: 5em;
   position: relative;
   margin-left: 10em;
 }
@@ -152,7 +152,7 @@ ol li
 #menubar
 { margin-right: 10em;
   position: relative;
-  top: -4.5em;
+  top: -3.5em;
 }
 
 ul#menu   /* ul element with ID menu */
@@ -195,7 +195,7 @@ ul#menu li a:hover
 
 #site_content
 {
-  width: auto;
+  width: 100%;
   padding: 0 0 1em 0;
   margin: 1em auto 0 2em;
   overflow: hidden;
@@ -271,7 +271,145 @@ ul.folderlist li.fileitem a:hover
 
 #segmenter
 {
+  position: relative;
+  outline: none;
+}
+
+a.segtool
+{
+  position: relative;
+  background-size: cover;
+  background-color: #FFF;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-color: #EEE;
+  border: 1px outset;
+  display: inline-block;
+}
+
+a.segtool.down
+{
+  border: 1px inset;
+  background-color: #DDD;
+}
+
+a.segtool:hover
+{
+  background-color: #EEE;
+}
+
+#brushbtn
+{
+  background-image: url('img/brush.png');
+}
+
+#erasebtn
+{
+  background-image: url('img/eraser.png');
+}
+
+#polybtn
+{
+  background-image: url('img/poly_tool.png');
+}
+
+#brushlabel
+{
+  position: relative;
+  left: 16px;
+  top: -12px;
+}
+
+#brushslider
+{
+  position: relative;
+  left: 16px;
+  top: -8px;
+}
+
+#brushsize
+{
+  position: relative;
+  width: 1.8em;
+  left: 16px;
+  top: -12px;
+}
+
+#segmenterapp
+{
+  position: relative;
+  overflow: auto;
+}
+
+#segmenterctrl
+{
   position: absolute;
-  left: 2em;
-  right: auto;
+  top: 0px;
+  width: 330px;
+  margin-left: 10px;
+}
+
+ul.taglist
+{
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+li.taglist
+{
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid;
+  padding: 2px;
+  border-color: #DDD;
+  width: 14em;
+}
+
+li.taglist:hover
+{
+  background-color: #EEE;
+}
+
+input.tag
+{
+  display: inline-block;
+  background-color: rgba(0, 0, 0, 0);
+  border: none;
+  width: 14em;
+}
+
+.colorswatch
+{
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, .2);
+}
+
+#plustag
+{
+  background-image: url('img/add_symbol.png');
+  background-color: rgba(0, 0, 0, 0);
+  background-size: 100%;
+  border: none;
+  width: 1em;
+  height: 1em;
+  outline: none;
+}
+
+#plustag:hover
+{
+  background-image: url('img/add_symbol_darker.png');
+  cursor: pointer;
+}
+
+#plustag:active
+{
+  margin: 1px;
 }
