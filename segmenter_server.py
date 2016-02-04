@@ -1,8 +1,10 @@
 #! /usr/bin/env python
-from flask import Flask, url_for, render_template, render_template_string
+from flask import Flask, url_for, render_template, render_template_string, request
 import os
 import ctypes
 import flask
+import base64
+import json
 
 #import matplotlib as mpl
 #mpl.use('Agg')
@@ -13,8 +15,8 @@ import flask
 app = Flask(__name__)
 
 base_path = os.path.expanduser('~')
-#start_path = os.path.relpath(os.getcwd(), base_path)
-start_path = "Pictures/2014-01-20"
+start_path = os.getcwd()
+#start_path = "Pictures/2014-01-20"
 
 @app.route('/')
 def index():
@@ -36,10 +38,40 @@ def enter_folder(path):
 def base_folder():
   return enter_folder('')
 
+def parseDict(form, base):
+  res = {}
+  prefix = base + '['
+  for key in form.keys():
+    if key.startswith(prefix) and key[-1] == ']':
+      res[key[len(prefix):-1]] = form[key]
+
+  return res
+
+@app.route('/save', methods=['GET', 'POST'])
+def save_file():
+  if request.method == 'POST':
+    segmentation = str(request.form['image'])
+    segmentation = segmentation[segmentation.find(',')+1:]
+    name = str(request.form['imageName'])
+    root, ext = os.path.splitext(name)
+    seg_name = root + '_segmented.png'
+    with open(seg_name, 'wb') as f:
+      f.write(base64.b64decode(segmentation))
+
+    tags = json.loads(request.form['tags'])
+    tag_name = root + '_segmented.txt'
+    with open(tag_name, 'w') as f:
+      for crt_tag in tags:
+        f.write(crt_tag[0] + ': ' + crt_tag[1] + '\n')
+
+    return ('', 204)
+
 @app.route('/segment/<path:path>')
 def segment(path):
+  full_path = os.path.join(base_path, path)
   return render_template('action.html', selected_menu='/',
-      image="/serveimage/" + path, image_name=os.path.basename(path))
+      image="/serveimage/" + path, image_name=os.path.basename(path),
+      image_path=full_path)
 
 @app.route('/serveimage/<path:path>')
 def serve_image(path):

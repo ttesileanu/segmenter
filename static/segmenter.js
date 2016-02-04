@@ -77,13 +77,16 @@ function selectTool(btn) {
       instance.selectMode('contour');
     }
   }
+
+  canvas.focus();
 }
 
 //// The Segmenter class
-function Segmenter(canvas, imageName) {
+function Segmenter(canvas, imageName, imagePath) {
   //// attributes
   this.canvas = canvas;
   this.imageName = imageName;
+  this.imagePath = imagePath;
   this.looping = false;
   this.overlayValid = false;
   this.drawMode = 'contour';
@@ -129,6 +132,14 @@ function Segmenter(canvas, imageName) {
       });
     registerToolById('polybtn');
     selectTool(toolbox['polybtn']);
+
+    // add click event for tag adding
+    document.getElementById('plustag').addEventListener('click', function() {
+        s.addNextTag();
+      });
+
+    // add the first tag
+    s.addNextTag();
 
     // start a loop waiting for the image to load
     this.loop();
@@ -469,7 +480,7 @@ function Segmenter(canvas, imageName) {
     var ctx = canvas.getContext("2d");
 
     // clear everything
-    ctx.fillStyle = "#EEEEEE";
+    ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // handle loading/error
@@ -481,6 +492,8 @@ function Segmenter(canvas, imageName) {
       } else {
         this.drawLoadingMessage(ctx);
         if (this.imageLoaded) {
+          var imgsize = document.getElementById('imgsize');
+          imgsize.textContent = '(' + this.image.width + ' x ' + this.image.height + ')';
           this.setInitialWindow();
           this.setupSegmentation();
           this.imageLoading = false;
@@ -953,6 +966,103 @@ function Segmenter(canvas, imageName) {
     var value = toolprops['brushbtn']['sizevalue'];
     slider.value = this.brushSize;
     value.value = slider.value;
+
+    canvas.focus();
+  }
+
+  this.createNewTagLi = function(tag, idx, color) {
+    // create the li element for a new tag
+    var li = document.createElement('li');
+    li.setAttribute('id', "tag" + idx);
+    li.classList.add("taglist");
+
+    var input = document.createElement('input');
+    input.setAttribute('id', "tagname" + idx);
+    input.setAttribute('type', "text");
+    input.setAttribute('value', tag);
+    input.classList.add("tag");
+
+    var swatch = document.createElement('span');
+    swatch.setAttribute('id', "swatch" + idx);
+    swatch.classList.add("colorswatch");
+    swatch.style.background = color;
+
+    li.appendChild(input);
+    li.appendChild(swatch);
+
+    var s = this;
+    input.addEventListener('change', function() {
+        s.selectTag(parseInt(this.id.substring(7), 10));
+      });
+    input.addEventListener('focus', function() {
+        s.selectTag(parseInt(this.id.substring(7), 10));
+      });
+    swatch.addEventListener('click', function() {
+        s.selectTag(parseInt(this.id.substring(6), 10));
+      });
+
+    return li;
+  }
+
+  this.addTag = function(tag, color) {
+    // add a new tag to the list of tags
+    var tag_list = document.getElementById('taglistobj');
+    var tag_items = tag_list.getElementsByTagName('li');
+    var n = tag_items.length;
+
+    var new_tag = this.createNewTagLi(tag, n, color);
+    
+    tag_list.appendChild(new_tag);
+
+    this.selectTag(n);
+  }
+
+  this.addNextTag = function() {
+    // make a new tag, with default properties
+    var tag_list = document.getElementById('taglistobj');
+    var tag_items = tag_list.getElementsByTagName('li');
+
+    var next_i = tag_items.length;
+    if (next_i >= color_cycle.length) {
+      window.alert("Oops: we're out of colors for the tags (maximum number is currently " + next_i + ").");
+      return;
+    }
+
+    this.addTag(next_i>0?("object" + next_i):"foreground", color_cycle[next_i]);
+  }
+
+  this.selectTag = function(idx) {
+    // select a particular tag to work with
+    var tag_list = document.getElementById('taglistobj');
+    var tag_items = tag_list.getElementsByTagName('li');
+    
+    for (var i = 0; i < tag_items.length; ++i) {
+      tag_items[i].classList.remove("selected");
+    }
+
+    tag_items[idx].classList.add("selected");
+
+    this.currentColor = color_cycle[idx];
+    canvas.focus();
+  }
+
+  this.getTagMap = function() {
+    // get list of tags and corresponding colors
+    map = [];
+    var tag_list = document.getElementById('taglistobj');
+    var tag_items = tag_list.getElementsByTagName('li');
+    for (var i = 0; i < tag_items.length; ++i) {
+      var item = tag_items[i];
+      var input = item.children[0];
+      var swatch = item.children[1];
+
+      var tag = input.value;
+      // XXX this is a little fragile
+      var color = color_cycle[i];
+
+      map.push([tag, color]);
+    }
+    return map;
   }
 
   //// initialization
@@ -976,6 +1086,7 @@ function Segmenter(canvas, imageName) {
   var s = this;
   // canvases can't have keyboard focus, so setting listener on document instead
   canvas.setAttribute('tabindex', 0);
+  // make sure the canvas has focus
   canvas.focus();
   var keyCollector = canvas;
   keyCollector.addEventListener("keypress", function(e) { return s.onKeyPress(e); }, false);
@@ -988,16 +1099,44 @@ function Segmenter(canvas, imageName) {
   canvas.addEventListener("mouseout", function(e) { return s.onMouseOut(e); }, false);
   canvas.addEventListener("mouseover", function(e) { return s.onMouseOver(e); }, false);
 
-  // make sure the canvas has focus
-  canvas.focus();
+  canvas.addEventListener("blur", function() {
+      setTimeout(function() {
+          if (document.activeElement != canvas)
+            canvas.style.opacity = 0.5;
+        }, 100);
+    }, false);
+  canvas.addEventListener("focus", function() { canvas.style.opacity = 1; }, false);
+
+  // register SAVE action
+  $(function() {
+    $('#savebtn').click(function() {
+      // XXX make sure that the segmentation is up to date
+      var segURL = s.segmentation.toDataURL();
+      var tagMap = s.getTagMap();
+      $.ajax({
+        type: 'POST',
+        url: $SCRIPT_ROOT + "/save",
+        data: {
+          image: segURL,
+          imageName: s.imagePath,
+          tags: JSON.stringify(tagMap)
+        }
+/*        data: {
+          imgBase64: segURL
+        }*/
+        // XXX add a success handler that shows that changes were saved
+      });
+      canvas.focus();
+    });
+  });
 
   // start up the segmenter
   this.setup();
 }
 
 //// function to initialize the segmenter
-function initSketch(imgName) {
-  instance = new Segmenter(canvas, imgName);
+function initSketch(imgName, imgPath) {
+  instance = new Segmenter(canvas, imgName, imgPath);
 }
 
 //// global variables
@@ -1005,3 +1144,5 @@ var instance;
 var canvas = document.getElementById("segmenter");
 var toolbox = {};
 var toolprops = {};
+var color_cycle = ['#FF0000', '#0000FF', '#00FF00', '#FFA000', '#BBBB22', '#FF00FF', '#00FFFF', '#FFFFFF',
+                   '#000000'];

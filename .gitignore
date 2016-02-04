@@ -55,3 +55,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# others
+test_images/
+.DS_Store
+static/img/*0.png
+static/img/*0.jpg

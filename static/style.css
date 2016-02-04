@@ -273,9 +273,10 @@ ul.folderlist li.fileitem a:hover
 {
   position: relative;
   outline: none;
+  border: 2px solid #444;
 }
 
-a.segtool
+.segtool
 {
   position: relative;
   background-size: cover;
@@ -288,13 +289,19 @@ a.segtool
   display: inline-block;
 }
 
-a.segtool.down
+.segtool.down
 {
   border: 1px inset;
   background-color: #DDD;
 }
 
-a.segtool:hover
+.segtool:active
+{
+  border: 1px inset;
+  background-color: #DDD;
+}
+
+.segtool:hover
 {
   background-color: #EEE;
 }
@@ -312,6 +319,11 @@ a.segtool:hover
 #polybtn
 {
   background-image: url('img/poly_tool.png');
+}
+
+#savebtn
+{
+  background-image: url('img/savebtn.png');
 }
 
 #brushlabel
@@ -362,15 +374,20 @@ li.taglist
   list-style-type: none;
   padding: 0;
   margin: 0;
-  border: 1px solid;
+  border: 1px solid #DDD;
   padding: 2px;
-  border-color: #DDD;
   width: 14em;
+}
+
+li.taglist.selected
+{
+  border: 1px inset #DDD;
 }
 
 li.taglist:hover
 {
   background-color: #EEE;
+/*  border: 1px solid #DDD;*/
 }
 
 input.tag
@@ -390,6 +407,11 @@ input.tag
   border-width: 1px;
   border-style: solid;
   border-color: rgba(0, 0, 0, .2);
+}
+
+.colorswatch:active
+{
+  margin: 1px;
 }
 
 #plustag

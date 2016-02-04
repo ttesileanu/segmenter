@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
-<h3>{{ image_name }}</h3>
+<h3 id="imgtitle">{{ image_name }}   <span id="imgsize" style="color: #999;"></span></h3>
 <div id="segmenterapp">
   <div id="segmenterdiv">
     <canvas id="segmenter">Segmenter canvas</canvas>
@@ -15,18 +15,21 @@
       <input id="brushsize" type="text" />
     </span>
     <div id="taglistdiv">
-      <ul class="taglist">
-        <li class="taglist" id="tag1">
-          <input class="tag" id="tagname1" type="text" value="foreground" />
-          <span class="colorswatch" style="background-color: #FF0000;"></span>
-        </li>
+      <ul class="taglist" id="taglistobj">
       </ul>
       <button id="plustag"></button>
     </div>
   </div>
+  <div id="segmentermeta">
+    <input type="submit" class="segtool" id="savebtn" value="" target="_blank" />
+  </div>
   <script src="{{ url_for('static', filename='segmenter.js') }}"></script>
 </div>
+<script type=text/javascript src="{{ url_for('static', filename='jquery-2.2.0.min.js') }}"></script>
+<script type=text/javascript>
+  $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+</script>
 {% endblock %}
 {% block bodyoptions %}
-onload="initSketch('{{ image }}');"
+onload="initSketch('{{ image }}', '{{ image_path }}');"
 {% endblock %}
