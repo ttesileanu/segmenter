@@ -1139,9 +1139,17 @@ function Segmenter(canvas, imageName, imagePath) {
   }
 
   //// initialization
+  // figure out a good size
+  var win_width = window.innerWidth;
+  var win_height = window.innerHeight;
+  var header_height = document.getElementById('imgtitle').getBoundingClientRect().bottom;
+
+  var max_width = Math.max(win_width - 380, 500);
+  var max_height = win_height - header_height - 80;
+
   // set the size of the segmenter on screen
-  var px_width = 900;
-  var px_height = 5*px_width/9;
+  var px_width = Math.min(max_width, 3*max_height/2);
+  var px_height = 2*px_width/3;
 
   document.getElementById("segmenterdiv").style.width = px_width + "px";
   document.getElementById("segmenterctrl").style.left = px_width + "px";
