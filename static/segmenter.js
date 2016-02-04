@@ -685,6 +685,14 @@ function Segmenter(canvas, imageName, imagePath) {
       var invY1 = this.overlayInvalidRect[2];
       var invY2 = this.overlayInvalidRect[3];
 
+      // make sure that the window is aligned with the pixels on the maximum minifaction, to
+      // avoid any artifacts
+      var maxFactor = Math.pow(2, this.nMipmaps-1);
+      invX1 = Math.floor(invX1/maxFactor)*maxFactor;
+      invX2 = Math.ceil(invX2/maxFactor)*maxFactor;
+      invY1 = Math.floor(invY1/maxFactor)*maxFactor;
+      invY2 = Math.ceil(invY2/maxFactor)*maxFactor;
+
       if (invX1 <= 0 && invY1 <= 0 && invX2 >= this.image.width && invY2 >= this.image.height) {
         // everything is invalidated
         this.overlay = this.scaleCropImage(this.image);
@@ -713,8 +721,11 @@ function Segmenter(canvas, imageName, imagePath) {
         var factor = 1.0;
         for (var i = 0; i < this.overlay_mipmaps.length; ++i) {
           var ctx = this.overlay_mipmaps[i].getContext("2d");
-          ctx.drawImage(this.changed_mipmaps[i], 0, 0, invW/factor, invH/factor,
-              invX1/factor, invY1/factor, Math.round(invW/factor), Math.round(invH/factor));
+          // these should be integers anyway, but just in case there are rounding problems...
+          var crtW = Math.round(invW/factor);
+          var crtH = Math.round(invH/factor);
+          ctx.drawImage(this.changed_mipmaps[i], 0, 0, crtW, crtH,
+              invX1/factor, invY1/factor, crtW, crtH);
           factor *= 2;
         }
 
