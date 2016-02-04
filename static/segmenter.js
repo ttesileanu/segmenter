@@ -604,6 +604,42 @@ function Segmenter(canvas, imageName, imagePath) {
     this.izoom.x = this.image.width/2;
     this.izoom.y = this.image.height/2;
     this.izoom.s = scale;
+
+    this.updateZoomDisplay();
+
+    // set handlers for zoom level input / zoom buttons
+    var s = this;
+    document.getElementById("zoomlevel").addEventListener('change',
+      function() {
+        var value = $.trim(this.value);
+        if (value[value.length - 1] == '%')
+          value = value.substring(0, value.length - 1);
+        var num = parseFloat(value);
+        if (isNaN(num)) {
+          var new_zoom = s.izoom.s;
+          s.updateZoomDisplay();
+        } else {
+          var new_zoom = num/100.0;
+          s.doZoom(new_zoom/s.izoom.s);
+        }
+        canvas.focus();
+      }, false);
+
+    document.getElementById("zoominbtn").addEventListener('click',
+      function() {
+        s.doZoom(1.1);
+        canvas.focus();
+      }, false);
+    document.getElementById("zoomoutbtn").addEventListener('click',
+      function() {
+        s.doZoom(1.0/1.1);
+        canvas.focus();
+      }, false);
+  }
+
+  this.updateZoomDisplay = function() {
+    var value = Math.round(this.izoom.s*100);
+    document.getElementById("zoomlevel").value = value + "%";
   }
 
   this.createMipmaps = function(img, n) {
@@ -824,6 +860,7 @@ function Segmenter(canvas, imageName, imagePath) {
       this.fixPosition();
 
     this.updateMouseShape(center);
+    this.updateZoomDisplay();
     this.redraw();
   }
 
@@ -1148,11 +1185,14 @@ function Segmenter(canvas, imageName, imagePath) {
   var max_height = win_height - header_height - 80;
 
   // set the size of the segmenter on screen
-  var px_width = Math.min(max_width, 3*max_height/2);
-  var px_height = 2*px_width/3;
+  var px_width = Math.round(Math.min(max_width, 3*max_height/2));
+  var px_height = Math.round(2*px_width/3);
 
   document.getElementById("segmenterdiv").style.width = px_width + "px";
   document.getElementById("segmenterctrl").style.left = px_width + "px";
+
+  var zoom_ctrls = document.getElementById("zoomcontrols");
+  zoom_ctrls.style.left = px_width - zoom_ctrls.getBoundingClientRect().width + "px";
   
   var dev_width = toDevice(px_width), dev_height = toDevice(px_height);
 

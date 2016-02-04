@@ -326,6 +326,29 @@ ul.folderlist li.fileitem a:hover
   background-image: url('img/savebtn.png');
 }
 
+#zoominbtn
+{
+  background-image: url('img/zoom_in.png');
+}
+
+#zoomoutbtn
+{
+  background-image: url('img/zoom_out.png');
+}
+
+#zoomlevel
+{
+  position: relative;
+  width: 2.8em;
+  top: -12px;
+  text-align: center;
+}
+
+#zoomcontrols
+{
+  position: absolute;
+}
+
 #brushlabel
 {
   position: relative;
@@ -352,6 +375,10 @@ ul.folderlist li.fileitem a:hover
 {
   position: relative;
   overflow: auto;
+  -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+  -moz-user-select: none; /* mozilla browsers */
+  -khtml-user-select: none; /* webkit (konqueror) browsers */
+  -ms-user-select: none; /* IE10+ */
 }
 
 #segmenterctrl

@@ -21,7 +21,12 @@
     </div>
   </div>
   <div id="segmentermeta">
-    <input type="submit" class="segtool" id="savebtn" value="" target="_blank" />
+    <a class="segtool" id="savebtn"></a>
+    <span id="zoomcontrols">
+      <a class="segtool" id="zoominbtn"></a>
+      <input id="zoomlevel" type="text" />
+      <a class="segtool" id="zoomoutbtn"></a>
+    </span>
   </div>
   <script src="{{ url_for('static', filename='segmenter.js') }}"></script>
 </div>
