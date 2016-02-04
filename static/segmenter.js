@@ -89,6 +89,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.imagePath = imagePath;
   this.looping = false;
   this.overlayValid = false;
+  this.overlayInvalidRect = [0, 0, 0, 0]; // xmin, xmax, ymin, ymax
   this.drawMode = 'contour';
   this.brushSize = 25.0;
   this.minBrush = 1;
@@ -98,6 +99,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.currentColor = "#FF0000";
   this.painting = false;
   this.invalidateAt = undefined;
+  this.nMipmaps = 4;
 
   //// member functions
   //// setup and flow control
@@ -316,7 +318,11 @@ function Segmenter(canvas, imageName, imagePath) {
           this.setBrushSize(this.brushSize + 1);
           this.updateMouseShape();
           return false;
-        }
+        }/* else if (key == 'x') {
+          this.invalidateOverlay();
+          this.redraw();
+          return false;
+        }*/
       }
     }
   }
@@ -652,8 +658,8 @@ function Segmenter(canvas, imageName, imagePath) {
     sw = Math.floor(sw) || img.width;
     sh = Math.floor(sh) || img.height;
 
-    w = Math.floor(w) || img.width;
-    h = Math.floor(h) || img.height;
+    w = Math.floor(w) || sw;
+    h = Math.floor(h) || sh;
 
     var tempCanvas = document.createElement('canvas');
     tempCanvas.width = w;
@@ -674,24 +680,69 @@ function Segmenter(canvas, imageName, imagePath) {
       }
     }
     if (!this.overlayValid) {
-      this.overlay = this.scaleCropImage(this.image);
+      var invX1 = this.overlayInvalidRect[0];
+      var invX2 = this.overlayInvalidRect[1];
+      var invY1 = this.overlayInvalidRect[2];
+      var invY2 = this.overlayInvalidRect[3];
 
-      var ctx = this.overlay.getContext("2d");
-      ctx.globalCompositeOperation = "lighter";
-      ctx.drawImage(this.segmentation, 0, 0);
+      if (invX1 <= 0 && invY1 <= 0 && invX2 >= this.image.width && invY2 >= this.image.height) {
+        // everything is invalidated
+        this.overlay = this.scaleCropImage(this.image);
 
-      this.overlay_mipmaps = this.createMipmaps(this.overlay, 8);
+        var ctx = this.overlay.getContext("2d");
+        ctx.globalCompositeOperation = "lighter";
+        ctx.drawImage(this.segmentation, 0, 0);
 
-      this.overlayValid = true;
+        this.overlay_mipmaps = this.createMipmaps(this.overlay, this.nMipmaps);
+
+        this.overlayValid = true;
+      } else {
+        // only a certain rectangle was invalidated
+        var invW = invX2 - invX1;
+        var invH = invY2 - invY1;
+        var changed = this.scaleCropImage(this.image, invX1, invY1, invW, invH);
+
+        var ctx = changed.getContext("2d");
+        ctx.globalCompositeOperation = "lighter";
+        ctx.drawImage(this.segmentation, invX1, invY1, invW, invH, 0, 0, invW, invH);
+
+        // create mipmaps of the changed section
+        this.changed_mipmaps = this.createMipmaps(changed, this.nMipmaps);
+
+        // update the full-size mipmaps
+        var factor = 1.0;
+        for (var i = 0; i < this.overlay_mipmaps.length; ++i) {
+          var ctx = this.overlay_mipmaps[i].getContext("2d");
+          ctx.drawImage(this.changed_mipmaps[i], 0, 0, invW/factor, invH/factor,
+              invX1/factor, invY1/factor, Math.round(invW/factor), Math.round(invH/factor));
+          factor *= 2;
+        }
+
+        this.overlayValid = true;
+      }
     }
+  }
+
+  this.invalidateOverlayRect = function(rect) {
+    // mark only a certain portion of the overlay as invalid
+    if (this.overlayValid) {
+      this.overlayInvalidRect = [Math.floor(rect[0]), Math.ceil(rect[1]),
+                                 Math.floor(rect[2]), Math.ceil(rect[3])];
+    } else {
+      var old = this.overlayInvalidRect;
+      this.overlayInvalidRect = [Math.min(old[0], Math.floor(rect[0])), Math.max(old[1], Math.ceil(rect[1])),
+                                 Math.min(old[2], Math.floor(rect[2])), Math.max(old[3], Math.ceil(rect[3]))];
+    }
+
+    this.overlayValid = false;
+    this.invalidateAt = undefined;
   }
 
   this.invalidateOverlay = function(t) {
     // mark the overlay data as invalid, or force it to invalidate a time t (milliseconds) in the future
     t = t || 0;
     if (t == 0) {
-      this.overlayValid = false;
-      this.invalidateAt = undefined;
+      this.invalidateOverlayRect([0, this.image.width, 0, this.image.height]);
     } else {
       if (this.invalidateAt === undefined) {
         var date = new Date();
@@ -825,6 +876,8 @@ function Segmenter(canvas, imageName, imagePath) {
     // this may be unnecessary...
     ctx.fillStyle = "rgba(0, 0, 0, 0)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    this.invalidateOverlay();
   }
 
   this.fillContour = function(ctx, contour, style) {
@@ -832,9 +885,13 @@ function Segmenter(canvas, imageName, imagePath) {
     // figure out the vertical bounds of the contour
     var min_y = contour[0].y;
     var max_y = min_y;
+    var min_x = contour[0].x;
+    var max_x = min_x;
 
     var i;
     for (i = 1; i < contour.length; ++i) {
+      if (contour[i].x < min_x) min_x = contour[i].x;
+      if (contour[i].x > max_x) max_x = contour[i].x;
       if (contour[i].y < min_y) min_y = contour[i].y;
       if (contour[i].y > max_y) max_y = contour[i].y;
     }
@@ -871,17 +928,20 @@ function Segmenter(canvas, imageName, imagePath) {
           ctx.fillRect(inters[i], y, inters[i+1]-inters[i], 1);
       }
     }
+
+    return [min_x, max_x, min_y, max_y];
   }
 
   this.finishContour = function() {
     // finish the contour, add it to the segmentation
     this.makingContour = false;
     if (this.contour.length > 1) {
-      this.fillContour(this.segmentation.getContext("2d"), this.contour, this.currentColor);
+      var rect = this.fillContour(this.segmentation.getContext("2d"), this.contour, this.currentColor);
+
+      this.invalidateOverlayRect(rect);
     }
 
     this.contour = [];
-    this.invalidateOverlay();
     this.redraw();
   }
 
@@ -922,10 +982,12 @@ function Segmenter(canvas, imageName, imagePath) {
       contour.push(vadd(v2, vr));
     }
 
-    this.fillContour(this.segmentation.getContext("2d"), contour, erase?'erase':this.currentColor);
+    var rect = this.fillContour(this.segmentation.getContext("2d"), contour, erase?'erase':this.currentColor);
+
+    this.invalidateOverlayRect(rect);
 
     // need to recalculate the overlay, but we don't want to slow things down by doing it too often
-    this.invalidateOverlay(50);
+//    this.invalidateOverlay(50);
   }
 
   this.selectMode = function(mode) {
