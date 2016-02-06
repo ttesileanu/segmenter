@@ -295,6 +295,12 @@ ul.folderlist li.fileitem a:hover
   background-color: #DDD;
 }
 
+.segtool.disabled
+{
+  border: 1px solid #CCC;
+  background-color: #DDD;
+}
+
 .segtool:active
 {
   border: 1px inset;
@@ -304,6 +310,19 @@ ul.folderlist li.fileitem a:hover
 .segtool:hover
 {
   background-color: #EEE;
+}
+
+.segtool.disabled:active
+{
+  border: 1px solid #CCC;
+  background-color: #DDD;
+}
+
+.segtool.disabled:hover
+{
+  border: 1px solid #CCC;
+  background-color: #DDD;
+  cursor: default;
 }
 
 #brushbtn
@@ -344,7 +363,17 @@ ul.folderlist li.fileitem a:hover
   text-align: center;
 }
 
-#zoomcontrols
+#undobtn
+{
+  background-image: url('img/undo.png');
+}
+
+#redobtn
+{
+  background-image: url('img/redo.png');
+}
+
+#zoomundocontrols
 {
   position: absolute;
 }

@@ -100,6 +100,10 @@ function Segmenter(canvas, imageName, imagePath) {
   this.painting = false;
   this.invalidateAt = undefined;
   this.nMipmaps = 4;
+  this.maxUndo = 1024;
+  this.maxUndoPixels = 256*1024*1024;
+  this.undoHistory = [];
+  this.undoPointer = -1;
 
   //// member functions
   //// setup and flow control
@@ -342,14 +346,36 @@ function Segmenter(canvas, imageName, imagePath) {
         sy = 1.0;
       } else if (e.keyCode == 40) { // down
         sy = -1.0;
-      }
+      } else if ((e.ctrlKey || e.metaKey) && !e.altKey && e.keyCode == 90) {
+        if (!e.shiftKey) {
+          // CTRL(/Command) + Z --> undo!
+          this.doUndo();
+        } else {
+          // CTRL(/Command) + SHIFT + Z --> redo!
+          this.doRedo();
+        }
+      }/* else {
+        document.getElementById("temp_ctrl").innerHTML = (e.ctrlKey?'on':'off');
+        document.getElementById("temp_shift").innerHTML = (e.shiftKey?'on':'off');
+        document.getElementById("temp_meta").innerHTML = (e.metaKey?'on':'off');
+        document.getElementById("temp_alt").innerHTML = (e.altKey?'on':'off');
+        document.getElementById("temp_key").innerHTML = (e.key || e.keyCode).toString();
+      }*/
       if (sx != 0 || sy != 0) {
         this.doScroll(sx*amt, sy*amt);
         return false;
       }
-      this.painting = false;
+      this.finishPainting();
     }
   }
+
+/*  this.onKeyUp = function(e) {
+      document.getElementById("temp_ctrl").innerHTML = (e.ctrlKey?'on':'off');
+      document.getElementById("temp_shift").innerHTML = (e.shiftKey?'on':'off');
+      document.getElementById("temp_meta").innerHTML = (e.metaKey?'on':'off');
+      document.getElementById("temp_alt").innerHTML = (e.altKey?'on':'off');
+      document.getElementById("temp_key").innerHTML = (e.key || e.keyCode);
+  }*/
 
   this.onMouseDown = function(e) {
     if (document.activeElement != canvas) {
@@ -371,11 +397,17 @@ function Segmenter(canvas, imageName, imagePath) {
           return false;
         }
       } else if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
+        // store a copy of the segmentation, for undo registration
+        this.beforePaint = this.scaleCropImage(this.segmentation);
+
         // start painting
         this.painting = true;
         var v = this.canvasToImage(this.mouse);
-        this.brushPaint(v, v, this.drawMode == 'eraser');
+        var rect = this.brushPaint(v, v, this.drawMode == 'eraser');
         this.redraw();
+
+        // keep track of the rectangle we're changing
+        this.brushRect = rect;
       }
     }
   }
@@ -416,9 +448,11 @@ function Segmenter(canvas, imageName, imagePath) {
       this.updateMouseShape(m);
     }
     if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
-      if (this.painting)
-        this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
+      if (this.painting) {
+        var rect = this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
                         this.drawMode == 'eraser');
+        this.brushRect = this.addRect(this.brushRect, rect);
+      }
       this.redraw();
     }
   }
@@ -429,9 +463,10 @@ function Segmenter(canvas, imageName, imagePath) {
     if (this.makingContour) {
       this.finishContour();
     } else if (this.painting) {
-      this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
+      var rect = this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
                       this.drawMode == 'eraser');
-      this.painting = false;
+      this.brushRect = this.addRect(this.brushRect, rect);
+      this.finishPainting();
       this.redraw();
     }
   }
@@ -443,7 +478,7 @@ function Segmenter(canvas, imageName, imagePath) {
       this.hoverOutImage(e);
       this.redraw();
     } else if (this.painting) {
-      this.painting = false;
+      this.finishPainting();
     }
   }
 
@@ -466,7 +501,7 @@ function Segmenter(canvas, imageName, imagePath) {
       this.draggingOutside = true;
     }
     if (this.painting)
-      this.painting = false;
+      this.finishPainting();
   }
 
   this.hoverOverImage = function(e) {
@@ -635,6 +670,19 @@ function Segmenter(canvas, imageName, imagePath) {
         s.doZoom(1.0/1.1);
         canvas.focus();
       }, false);
+
+      document.getElementById("undobtn").addEventListener('click',
+        function() {
+          canvas.focus();
+          s.doUndo();
+        }, false);
+      document.getElementById("redobtn").addEventListener('click',
+        function() {
+          canvas.focus();
+          s.doRedo();
+        }, false);
+
+      this.updateUndoButtons();
   }
 
   this.updateZoomDisplay = function() {
@@ -768,6 +816,12 @@ function Segmenter(canvas, imageName, imagePath) {
         this.overlayValid = true;
       }
     }
+  }
+
+  this.addRect = function(rect1, rect2) {
+    // return a larger rectangle that includes both
+    return [Math.min(rect1[0], rect2[0]), Math.max(rect1[1], rect2[1]),
+            Math.min(rect1[2], rect2[2]), Math.max(rect1[3], rect2[3])];
   }
 
   this.invalidateOverlayRect = function(rect) {
@@ -928,9 +982,8 @@ function Segmenter(canvas, imageName, imagePath) {
     this.invalidateOverlay();
   }
 
-  this.fillContour = function(ctx, contour, style) {
-    // fill the contour on the given context with the given style
-    // figure out the vertical bounds of the contour
+  this.findBoundingRect = function(contour) {
+    // find the bounding rectangle of the polygon
     var min_y = contour[0].y;
     var max_y = min_y;
     var min_x = contour[0].x;
@@ -945,8 +998,20 @@ function Segmenter(canvas, imageName, imagePath) {
     }
 
     // round these to integers
+    min_x = Math.floor(min_x);
+    max_x = Math.ceil(max_x);
     min_y = Math.floor(min_y);
     max_y = Math.ceil(max_y);
+
+    return [min_x, max_x, min_y, max_y];
+  }
+
+  this.fillContour = function(ctx, contour, style) {
+    // fill the contour on the given context with the given style
+    // figure out the vertical bounds of the contour
+    var rect = this.findBoundingRect(contour);
+    var min_y = rect[2];
+    var max_y = rect[3];
 
     // start filling
     if (style != 'erase')
@@ -977,20 +1042,31 @@ function Segmenter(canvas, imageName, imagePath) {
       }
     }
 
-    return [min_x, max_x, min_y, max_y];
+    return rect;
   }
 
   this.finishContour = function() {
     // finish the contour, add it to the segmentation
     this.makingContour = false;
     if (this.contour.length > 1) {
-      var rect = this.fillContour(this.segmentation.getContext("2d"), this.contour, this.currentColor);
+      var rect = this.findBoundingRect(this.contour);
+      this.registerUndo(this.segmentation, rect);
+      this.fillContour(this.segmentation.getContext("2d"), this.contour, this.currentColor);
+      this.appendRedo(this.segmentation);
 
       this.invalidateOverlayRect(rect);
     }
 
     this.contour = [];
     this.redraw();
+  }
+
+  this.finishPainting = function() {
+    if (this.painting) {
+      // finish brush painting
+      this.registerUndo(this.beforePaint, this.brushRect, this.segmentation);
+      this.painting = false;
+    }
   }
 
   this.brushPaint = function(v1, v2, erase) {
@@ -1036,6 +1112,8 @@ function Segmenter(canvas, imageName, imagePath) {
 
     // need to recalculate the overlay, but we don't want to slow things down by doing it too often
 //    this.invalidateOverlay(50);
+  
+    return rect;
   }
 
   this.selectMode = function(mode) {
@@ -1175,6 +1253,127 @@ function Segmenter(canvas, imageName, imagePath) {
     return map;
   }
 
+  this.appendRedo = function(dest) {
+    // append an "after" tag for the last undo that was registered
+    var lastUndo = this.undoHistory[this.undoPointer];
+    var region = lastUndo.region;
+    var after = this.scaleCropImage(dest, region.x, region.y, region.w, region.h);
+    
+    lastUndo.after = after;
+  }
+
+  this.registerUndo = function(src, rect, dest) {
+    // register an undo level corresponding to changes in the given rect
+    // src is a canvas containing the "before" segmentation
+    // dest, if provided, is a canvas containing the "after" segmentation
+    var x1 = rect[0];
+    var x2 = rect[1];
+    var y1 = rect[2];
+    var y2 = rect[3];
+
+    // make sure that the window is aligned with the pixels on the maximum minifaction, to
+    // avoid any artifacts
+    var maxFactor = Math.pow(2, this.nMipmaps-1);
+    x1 = Math.floor(x1/maxFactor)*maxFactor;
+    x2 = Math.ceil(x2/maxFactor)*maxFactor;
+    y1 = Math.floor(y1/maxFactor)*maxFactor;
+    y2 = Math.ceil(y2/maxFactor)*maxFactor;
+
+    var w = x2 - x1;
+    var h = y2 - y1;
+
+    var before = this.scaleCropImage(src, x1, y1, w, h);
+
+    if (dest) {
+      var after = this.scaleCropImage(dest, x1, y1, w, h);
+    } else {
+      var after = null;
+    }
+
+    if (this.undoPointer < this.undoHistory.length - 1) {
+      // first delete all the redos
+      this.undoHistory.splice(this.undoPointer+1);
+    }
+
+    this.undoHistory.push({region: {x: x1, y: y1, w: w, h: h}, before: before, after: after});
+    ++this.undoPointer;
+
+    // do we need to get rid of some undo levels?
+    if (this.undoHistory.length > this.maxUndo) {
+      this.undoHistory.splice(0, this.undoHistory.length - this.maxUndo);
+    }
+
+    // are we taking up too much space?
+    var pxUsage = 0;
+    for (var i = this.undoHistory.length - 1; i >= 0; --i) {
+      var crtUndo = this.undoHistory[i];
+      // twice because we have (or will have) both before and after
+      pxUsage += 2*crtUndo.region.w*crtUndo.region.h;
+      if (pxUsage > this.maxUndoPixels) {
+        // need to delete everything up to and including the current level
+        this.undoHistory.splice(0, i+1);
+        break;
+      }
+    }
+    
+    this.updateUndoButtons();
+  }
+
+  this.doUndo = function() {
+    if (this.undoHistory.length > 0 && this.undoPointer >= 0) {
+      var crtUndo = this.undoHistory[this.undoPointer];
+      var region = crtUndo.region;
+
+      var ctx = this.segmentation.getContext("2d");
+      var old = ctx.globalCompositeOperation;
+      ctx.clearRect(region.x, region.y, region.w, region.h);
+      ctx.drawImage(crtUndo.before, region.x, region.y);
+
+      --this.undoPointer;
+
+      this.updateUndoButtons();
+      this.invalidateOverlay();
+//      this.invalidateOverlayRect([region.x, region.x+region.w, region.y, region.y+region.h]);
+      this.redraw();
+    }
+  }
+
+  this.doRedo = function() {
+    if (this.undoPointer + 1 < this.undoHistory.length) {
+      ++this.undoPointer;
+
+      var crtUndo = this.undoHistory[this.undoPointer];
+      var region = crtUndo.region;
+
+      var ctx = this.segmentation.getContext("2d");
+      var old = ctx.globalCompositeOperation;
+      ctx.clearRect(region.x, region.y, region.w, region.h);
+      ctx.drawImage(crtUndo.after, region.x, region.y);
+
+      this.updateUndoButtons();
+      this.invalidateOverlay();
+//      this.invalidateOverlayRect([region.x, region.x+region.w, region.y, region.y+region.h]);
+      this.redraw();
+    }
+  }
+
+  this.updateUndoButtons = function() {
+    var undobtn = document.getElementById("undobtn");
+    var redobtn = document.getElementById("redobtn");
+
+    if (this.undoHistory.length == 0 || this.undoPointer < 0) {
+      undobtn.classList.add('disabled');
+    } else {
+      undobtn.classList.remove('disabled');
+    }
+
+    if (this.undoPointer + 1 >= this.undoHistory.length) {
+      redobtn.classList.add('disabled');
+    } else {
+      redobtn.classList.remove('disabled');
+    }
+  }
+
   //// initialization
   // figure out a good size
   var win_width = window.innerWidth;
@@ -1191,7 +1390,7 @@ function Segmenter(canvas, imageName, imagePath) {
   document.getElementById("segmenterdiv").style.width = px_width + "px";
   document.getElementById("segmenterctrl").style.left = px_width + "px";
 
-  var zoom_ctrls = document.getElementById("zoomcontrols");
+  var zoom_ctrls = document.getElementById("zoomundocontrols");
   zoom_ctrls.style.left = px_width - zoom_ctrls.getBoundingClientRect().width + "px";
   
   var dev_width = toDevice(px_width), dev_height = toDevice(px_height);
@@ -1212,6 +1411,7 @@ function Segmenter(canvas, imageName, imagePath) {
   var keyCollector = canvas;
   keyCollector.addEventListener("keypress", function(e) { return s.onKeyPress(e); }, false);
   keyCollector.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
+//  keyCollector.addEventListener("keyup", function(e) { return s.onKeyUp(e); }, false);
 
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("mousedown", function(e) { return s.onMouseDown(e); }, false);
