@@ -71,9 +71,9 @@ function selectTool(btn) {
   if (instance) {
     if (btn.id == 'brushbtn') {
       instance.selectMode('brush');
-    } else if (btn.id == 'erasebtn') {
+    } /*else if (btn.id == 'erasebtn') {
       instance.selectMode('eraser');
-    } else {
+    } */else {
       instance.selectMode('contour');
     }
   }
@@ -104,6 +104,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.maxUndoPixels = 256*1024*1024;
   this.undoHistory = [];
   this.undoPointer = -1;
+  this.eraserOn = false;
 
   //// member functions
   //// setup and flow control
@@ -131,11 +132,11 @@ function Segmenter(canvas, imageName, imagePath) {
         'sizevalue': document.getElementById('brushsize'),
         'span': document.getElementById('brushctrl')
       });
-    registerToolById('erasebtn', {
+/*    registerToolById('erasebtn', {
         'sizeslider': document.getElementById('brushslider'),
         'sizevalue': document.getElementById('brushsize'),
         'span': document.getElementById('brushctrl')
-      });
+      });*/
     registerToolById('polybtn');
     selectTool(toolbox['polybtn']);
 
@@ -146,6 +147,18 @@ function Segmenter(canvas, imageName, imagePath) {
 
     // add the first tag
     s.addNextTag();
+    
+    // add click event for eraser
+    var eraserinput = document.getElementById('tagnameeraser');
+    var eraserswatch = document.getElementById('swatcheraser');
+    eraserinput.addEventListener('click', function() {
+        s.enableEraseMode();
+        canvas.focus();
+      });
+    eraserswatch.addEventListener('click', function() {
+        s.enableEraseMode();
+        canvas.focus();
+      });
 
     // start a loop waiting for the image to load
     this.loop();
@@ -313,7 +326,7 @@ function Segmenter(canvas, imageName, imagePath) {
         this.doZoom(-1);
         return false;
       }
-      if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
+      if (this.drawMode == 'brush') {
         if (key == '[') {
           this.setBrushSize(this.brushSize - 1);
           this.updateMouseShape();
@@ -349,10 +362,14 @@ function Segmenter(canvas, imageName, imagePath) {
       } else if ((e.ctrlKey || e.metaKey) && !e.altKey && e.keyCode == 90) {
         if (!e.shiftKey) {
           // CTRL(/Command) + Z --> undo!
+          e.preventDefault();
           this.doUndo();
+          return false;
         } else {
           // CTRL(/Command) + SHIFT + Z --> redo!
+          e.preventDefault();
           this.doRedo();
+          return false;
         }
       }/* else {
         document.getElementById("temp_ctrl").innerHTML = (e.ctrlKey?'on':'off');
@@ -396,14 +413,14 @@ function Segmenter(canvas, imageName, imagePath) {
           this.redraw();
           return false;
         }
-      } else if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
+      } else if (this.drawMode == 'brush') {
         // store a copy of the segmentation, for undo registration
         this.beforePaint = this.scaleCropImage(this.segmentation);
 
         // start painting
         this.painting = true;
         var v = this.canvasToImage(this.mouse);
-        var rect = this.brushPaint(v, v, this.drawMode == 'eraser');
+        var rect = this.brushPaint(v, v, this.eraserOn);
         this.redraw();
 
         // keep track of the rectangle we're changing
@@ -416,7 +433,7 @@ function Segmenter(canvas, imageName, imagePath) {
     if (m === undefined) m = this.mouse;
     // update mouse shape based on its position
     if (this.isInImage(m)) {
-      if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
+      if (this.drawMode == 'brush') {
         canvas.style.cursor = 'none';
       } else {
         canvas.style.cursor = 'crosshair';
@@ -447,10 +464,10 @@ function Segmenter(canvas, imageName, imagePath) {
     } else {
       this.updateMouseShape(m);
     }
-    if (this.drawMode == 'brush' || this.drawMode == 'eraser') {
+    if (this.drawMode == 'brush') {
       if (this.painting) {
         var rect = this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
-                        this.drawMode == 'eraser');
+                        this.eraserOn);
         this.brushRect = this.addRect(this.brushRect, rect);
       }
       this.redraw();
@@ -464,7 +481,7 @@ function Segmenter(canvas, imageName, imagePath) {
       this.finishContour();
     } else if (this.painting) {
       var rect = this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
-                      this.drawMode == 'eraser');
+                      this.eraserOn);
       this.brushRect = this.addRect(this.brushRect, rect);
       this.finishPainting();
       this.redraw();
@@ -548,7 +565,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
     if (this.contour && this.contour.length > 0) this.drawContour(ctx);
 
-    if ((this.drawMode == 'brush' || this.drawMode == 'eraser') && this.isInImage(this.mouse)) {
+    if ((this.drawMode == 'brush') && this.isInImage(this.mouse)) {
       var imgSize = this.brushSize*this.izoom.s;
 
       ctx.beginPath();
@@ -1051,7 +1068,7 @@ function Segmenter(canvas, imageName, imagePath) {
     if (this.contour.length > 1) {
       var rect = this.findBoundingRect(this.contour);
       this.registerUndo(this.segmentation, rect);
-      this.fillContour(this.segmentation.getContext("2d"), this.contour, this.currentColor);
+      this.fillContour(this.segmentation.getContext("2d"), this.contour, ((this.eraserOn)?'erase':this.currentColor));
       this.appendRedo(this.segmentation);
 
       this.invalidateOverlayRect(rect);
@@ -1121,7 +1138,7 @@ function Segmenter(canvas, imageName, imagePath) {
       this.drawMode = mode;
       this.contour = [];
 
-      if (mode == 'brush' || mode == 'eraser') {
+      if (mode == 'brush') {
         // the size slider is the same for the brush and the eraser
         toolprops['brushbtn']['span'].style.visibility = 'visible';
         var slider = toolprops['brushbtn']['sizeslider'];
@@ -1182,8 +1199,12 @@ function Segmenter(canvas, imageName, imagePath) {
     input.addEventListener('change', function() {
         s.selectTag(parseInt(this.id.substring(7), 10));
       });
-    input.addEventListener('focus', function() {
+    input.addEventListener('click', function() {
         s.selectTag(parseInt(this.id.substring(7), 10));
+      });
+    input.addEventListener('dblclick', function() {
+        s.selectTag(parseInt(this.id.substring(7), 10), false);
+        this.focus();
       });
     swatch.addEventListener('click', function() {
         s.selectTag(parseInt(this.id.substring(6), 10));
@@ -1210,7 +1231,7 @@ function Segmenter(canvas, imageName, imagePath) {
     var tag_list = document.getElementById('taglistobj');
     var tag_items = tag_list.getElementsByTagName('li');
 
-    var next_i = tag_items.length;
+    var next_i = tag_items.length-1;
     if (next_i >= color_cycle.length) {
       window.alert("Oops: we're out of colors for the tags (maximum number is currently " + next_i + ").");
       return;
@@ -1219,7 +1240,7 @@ function Segmenter(canvas, imageName, imagePath) {
     this.addTag(next_i>0?("object" + next_i):"foreground", color_cycle[next_i]);
   }
 
-  this.selectTag = function(idx) {
+  this.selectTag = function(idx, focus) {
     // select a particular tag to work with
     var tag_list = document.getElementById('taglistobj');
     var tag_items = tag_list.getElementsByTagName('li');
@@ -1228,10 +1249,19 @@ function Segmenter(canvas, imageName, imagePath) {
       tag_items[i].classList.remove("selected");
     }
 
-    tag_items[idx].classList.add("selected");
+//    document.getElementById('tageraser').classList.remove('selected');
 
-    this.currentColor = color_cycle[idx];
-    canvas.focus();
+    if (idx >= 0) {
+      tag_items[idx].classList.add("selected");
+
+      this.currentColor = color_cycle[idx-1];
+      this.eraserOn = false;
+    }
+
+    if (focus === undefined)
+      focus = true;
+    if (focus)
+      canvas.focus();
   }
 
   this.getTagMap = function() {
@@ -1374,6 +1404,12 @@ function Segmenter(canvas, imageName, imagePath) {
     }
   }
 
+  this.enableEraseMode = function() {
+    this.selectTag(-1);
+    document.getElementById('tageraser').classList.add('selected');
+    this.eraserOn = true;
+  }
+
   //// initialization
   // figure out a good size
   var win_width = window.innerWidth;
@@ -1412,6 +1448,8 @@ function Segmenter(canvas, imageName, imagePath) {
   keyCollector.addEventListener("keypress", function(e) { return s.onKeyPress(e); }, false);
   keyCollector.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
 //  keyCollector.addEventListener("keyup", function(e) { return s.onKeyUp(e); }, false);
+
+  document.addEventListener("click", function() { canvas.focus(); }, false);
 
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("mousedown", function(e) { return s.onMouseDown(e); }, false);

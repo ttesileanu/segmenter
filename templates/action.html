@@ -8,7 +8,7 @@
   <div id="segmenterctrl">
     <a class="segtool" id="polybtn"></a>
     <a class="segtool" id="brushbtn"></a>
-    <a class="segtool" id="erasebtn"></a>
+<!--    <a class="segtool" id="erasebtn"></a>-->
     <span id="brushctrl" style="visibility: hidden;" />
       <label for="brushslider" id="brushlabel">size</label>
       <input id="brushslider" type="range" />
@@ -16,6 +16,9 @@
     </span>
     <div id="taglistdiv">
       <ul class="taglist" id="taglistobj">
+        <li class="taglist" id="tageraser">
+          <input class="tag" id="tagnameeraser" type="text" value="eraser" readonly="true" tabindex="-1" /><span class="colorswatch" id="swatcheraser" style="background-image: url({{ url_for('static', filename='img/eraser.png') }}); background-size: cover;"></span>
+        </li>
       </ul>
       <button id="plustag"></button>
     </div>
