@@ -105,6 +105,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.undoHistory = [];
   this.undoPointer = -1;
   this.eraserOn = false;
+  this.hoverOutPoint = Vector(0, 0);
 
   //// member functions
   //// setup and flow control
@@ -224,7 +225,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
     // snap the point to the closest edge of the image window boundary
     // first we need to find the image window in image coordinates
-    edges = this.getImageWindow();
+    var edges = this.getImageWindow();
     var diffs = [Math.abs(edges[0] - m.x),  // left border
                  Math.abs(edges[1] - m.x),  // right border
                  Math.abs(edges[2] - m.y),  // top border
@@ -513,6 +514,8 @@ function Segmenter(canvas, imageName, imagePath) {
     if (!this.draggingOutside) {
       var m = this.extractMousePosition(e);
       this.setMouse(m);
+
+      this.hoverOutPoint = m;
       if (this.drawMode == 'contour')
         this.addPenetrationPoint(m);
       this.draggingOutside = true;
@@ -521,14 +524,62 @@ function Segmenter(canvas, imageName, imagePath) {
       this.finishPainting();
   }
 
+  this.findClosestEdge = function(v) {
+    // find the edge closes to point v
+    // left --> 0, bottom --> 1, right --> 2, top --> 3
+    var edges = this.getCanvasWindow();
+    var d0 = v.x - edges[0];
+    var d2 = edges[1] - v.x;
+    var d3 = v.y - edges[2];
+    var d1 = edges[3] - v.y;
+
+    var edge = 0;
+    var d = d0;
+    if (d1 < d) {
+      edge = 1;
+      d = d1;
+    }
+    if (d2 < d) {
+      edge = 2;
+      d = d2;
+    }
+    if (d3 < d) {
+      edge = 3;
+      d = d3;
+    }
+
+    return edge;
+  }
+
   this.hoverOverImage = function(e) {
     // mouse has returned inside image and/or canvas area
     var m = this.extractMousePosition(e);
     this.setMouse(m);
     if (this.isInImage(m)) {
-      if (this.drawMode == 'contour')
-        this.addPenetrationPoint(m);
-      this.draggingOutside = false;
+      if (this.draggingOutside) {
+        // check whether we've gone around a corner
+        var old_edge = this.findClosestEdge(this.hoverOutPoint);
+        var new_edge = this.findClosestEdge(m);
+
+        if (old_edge != new_edge) {
+          var win = this.getCanvasWindow();
+          var corners = [new Vector(win[0], win[3]),     // between left and bottom edges (0 -- 1)
+                         new Vector(win[1], win[3]),     // between bottom and right edges (1 -- 2)
+                         new Vector(win[1], win[2]),     // between right and top edges (2 -- 3)
+                         new Vector(win[0], win[2])];    // between left and top edges (3 -- 0)
+          var min_edge = Math.min(new_edge, old_edge);
+          // always going around at least a single corner, since old_edge != new_edge
+          this.contour.push(this.canvasToImage(corners[min_edge]));
+          if (Math.abs(new_edge - old_edge) == 2) {
+            // going around two corners -- do this counter clockwise-ly
+            this.contour.push(this.canvasToImage(corners[(min_edge+1)%4]));
+          }
+        }
+
+        if (this.drawMode == 'contour')
+          this.addPenetrationPoint(m);
+        this.draggingOutside = false;
+      }
     }
   }
 
