@@ -589,7 +589,7 @@ function Segmenter(canvas, imageName, imagePath) {
     var ctx = canvas.getContext("2d");
 
     // clear everything
-    ctx.fillStyle = "#FFFFFF";
+      ctx.fillStyle = this.imageLoading?"#DDD":"#FFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // handle loading/error
@@ -1206,7 +1206,6 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.finishContour = function() {
     // finish the contour, add it to the segmentation
-    this.makingContour = false;
     if (this.contour.length > 1) {
       if (this.curveSmoothFactor > 0) {
         // smooth the curve -- this removes jagged edges that are particularly jarring
@@ -1224,6 +1223,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
       this.invalidateOverlayRect(rect);
     }
+    this.makingContour = false;
 
     this.contour = [];
     this.redraw();
