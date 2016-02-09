@@ -106,7 +106,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.hoverOutPoint = Vector(0, 0);
   this.curveSmoothFactor = 1.0;
   this.minSmoothFactor = 0.0;
-  this.maxSmoothFactor = 100.0;
+  this.maxSmoothFactor = 25.0;
 
   //// member functions
   //// setup and flow control
@@ -1115,8 +1115,10 @@ function Segmenter(canvas, imageName, imagePath) {
     return rect;
   }
 
-  this.smoothCurve = function(contour, scale) {
+  this.smoothCurve = function(contour, scale, nfactor) {
     // smooth the given polygon on the given scale
+    // generate a curve with at most nfactor*(curve length)/max_dist points
+    nfactor = nfactor || 10;
     
     // smoothing function: 0.5*(1 + cos(pi/2*x/s)) for x in [-2s, 2s]
     // this vanishes at the edges, and is equal to 0.5 at x = s, 1.0 at x = 0
@@ -1153,11 +1155,16 @@ function Segmenter(canvas, imageName, imagePath) {
     // only interested in points within a distance max_dist
     // that means we only have to look in the adjacent buckets
     var res = [];
-    var curve_dist = function(k, l) { return (k>l ? d[k] - d[l] : d[l] - d[k]); };
+    var curve_dist = function(k, d2) {
+      return Math.min(Math.abs(d[k] - d2),
+        Math.min(Math.abs(d[k] + clen - d2), Math.abs(d2 + clen - d[k])));
+    };
     // urgh! javascript modulo ('%') is negative for negative first argument!
     var real_mod = function(a, b) { return ((a%b) + b)%b; };
-    for (var i = 0; i < contour.length; ++i) {
-      var ibucket = Math.floor(d[i] / max_dist);
+    var n_points = Math.ceil(nfactor*clen/max_dist);
+    var d_step = clen/n_points;
+    for (var d2 = 0; d2 < clen; d2 += d_step) {
+      var ibucket = Math.floor(d2 / max_dist);
       var bucket = buckets[ibucket];
       var lbucket = buckets[real_mod((ibucket - 1), n_buckets)];
       var rbucket = buckets[real_mod((ibucket + 1), n_buckets)];
@@ -1168,20 +1175,22 @@ function Segmenter(canvas, imageName, imagePath) {
         neighbors.push(bucket[j]);
       }
       for (var j = 0; j < lbucket.length; ++j) {
-        if (curve_dist(i, lbucket[j]) < max_dist)
+        if (curve_dist(lbucket[j], d2) < max_dist)
           neighbors.push(lbucket[j]);
       }
       for (var j = 0; j < rbucket.length; ++j) {
-        if (curve_dist(i, rbucket[j]) < max_dist)
+        if (curve_dist(rbucket[j], d2) < max_dist)
           neighbors.push(rbucket[j]);
       }
+      
+      if (neighbors.length == 0) continue;
 
       var smoothed = new Vector(0, 0);
       var denom = 0;
       // smoothing function: 0.5*(1 + cos(pi*x/max_dist))
       for (var j = 0; j < neighbors.length; ++j) {
         var k = neighbors[j];
-        var dist = curve_dist(i, k);
+        var dist = curve_dist(k, d2);
         var f = 0.5*(1 + Math.cos(Math.PI*dist/max_dist));
         smoothed = vadd(smoothed, vscale(f, contour[k]));
         denom += f;
@@ -1204,6 +1213,7 @@ function Segmenter(canvas, imageName, imagePath) {
         // when selecting on the image when it's not full-size
         this.contour = this.smoothCurve(this.contour,
           window.devicePixelRatio*this.curveSmoothFactor/this.izoom.s);
+        this.redraw();
       }
 
       var rect = this.findBoundingRect(this.contour);
