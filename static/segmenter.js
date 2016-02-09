@@ -433,6 +433,10 @@ function Segmenter(canvas, imageName, imagePath) {
   this.updateMouseShape = function(m) {
     if (m === undefined) m = this.mouse;
     // update mouse shape based on its position
+    if (document.activeElement != canvas) {
+      canvas.style.cursor = 'pointer';
+      return;
+    }
     if (this.isInImage(m)) {
       if (this.drawMode == 'brush') {
         canvas.style.cursor = 'none';
@@ -1636,13 +1640,15 @@ function Segmenter(canvas, imageName, imagePath) {
   canvas.addEventListener("mouseout", function(e) { return s.onMouseOut(e); }, false);
   canvas.addEventListener("mouseover", function(e) { return s.onMouseOver(e); }, false);
 
-  canvas.addEventListener("blur", function() {
+/*  canvas.addEventListener("blur", function() {
       setTimeout(function() {
           if (document.activeElement != canvas)
             canvas.style.opacity = 0.5;
         }, 100);
     }, false);
-  canvas.addEventListener("focus", function() { canvas.style.opacity = 1; }, false);
+  canvas.addEventListener("focus", function() { canvas.style.opacity = 1; }, false);*/
+  canvas.addEventListener("blur", function() { s.updateMouseShape(); }, false);
+  canvas.addEventListener("focus", function() { s.updateMouseShape(); }, false);
 
   // register SAVE action
   $(function() {
