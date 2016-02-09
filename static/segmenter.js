@@ -107,6 +107,8 @@ function Segmenter(canvas, imageName, imagePath) {
   this.curveSmoothFactor = 1.0;
   this.minSmoothFactor = 0.0;
   this.maxSmoothFactor = 25.0;
+  this.freehand = false;
+  this.closenessThreshold = 5.0;
 
   //// member functions
   //// setup and flow control
@@ -372,6 +374,12 @@ function Segmenter(canvas, imageName, imagePath) {
           this.doRedo();
           return false;
         }
+      } else if (e.keyCode == 13) {
+        // finish path
+        this.finishContour();
+      } else if (e.keyCode == 27) {
+        // discard path
+        this.discardContour();
       }/* else {
         document.getElementById("temp_ctrl").innerHTML = (e.ctrlKey?'on':'off');
         document.getElementById("temp_shift").innerHTML = (e.shiftKey?'on':'off');
@@ -406,14 +414,15 @@ function Segmenter(canvas, imageName, imagePath) {
     // start creating contour
     if (e.button == 0) { // left click
       if (this.drawMode == 'contour') {
-        // start a new contour
-        if (this.isInImage(m)) {
+        this.freehand = true;
+        if (this.isInImage(m) && !this.makingContour) {
+          // start a new contour
           this.makingContour = true;
           this.draggingOutside = false;
           this.contour = [this.canvasToImage(m)];
-          this.redraw();
-          return false;
         }
+        this.redraw();
+        return false;
       } else if (this.drawMode == 'brush') {
         // store a copy of the segmentation, for undo registration
         this.beforePaint = this.scaleCropImage(this.segmentation);
@@ -453,16 +462,22 @@ function Segmenter(canvas, imageName, imagePath) {
     var m = this.extractMousePosition(e);
     this.setMouse(m);
     if (this.makingContour) {
-      if (this.isInImage(m)) {
-        // if it was outside, then we need to handle the entry point
-        if (this.draggingOutside) {
-          this.hoverOverImage(e);
+      if (this.freehand) {
+        if (this.isInImage(m)) {
+          // if it was outside, then we need to handle the entry point
+          if (this.draggingOutside) {
+            this.hoverOverImage(e);
+          }
+          this.contour.push(this.canvasToImage(m));
+        } else {
+          // if it was inside, we need to handle the exit point
+          if (!this.draggingOutside) {
+            this.hoverOutImage(e);
+          }
         }
-        this.contour.push(this.canvasToImage(m));
       } else {
-        // if it was inside, we need to handle the exit point
-        if (!this.draggingOutside) {
-          this.hoverOutImage(e);
+        if (this.contour.length > 0) {
+          this.contour[this.contour.length - 1] = this.canvasToImage(m);
         }
       }
       this.redraw();
@@ -483,7 +498,19 @@ function Segmenter(canvas, imageName, imagePath) {
     var m = this.extractMousePosition(e);
     this.setMouse(m);
     if (this.makingContour) {
-      this.finishContour();
+      var cm = this.canvasToImage(m);
+
+      var cthresh = this.closenessThreshold*window.devicePixelRatio/this.izoom.s;
+      if (this.contour.length > 0) {
+        if (vnorm(vsub(cm, this.contour[0])) < cthresh) {
+          // have this equivalent to closing the contour
+          this.finishContour();
+          return false;
+        }
+      }
+      this.contour.push(this.canvasToImage(m));
+      this.freehand = false;
+      this.redraw();
     } else if (this.painting) {
       var rect = this.brushPaint(this.canvasToImage(this.oldMouse), this.canvasToImage(this.mouse),
                       this.eraserOn);
@@ -495,7 +522,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.onMouseOut = function(e) {
     // mouse exiting canvas
-    if (this.makingContour) {
+    if (this.makingContour && this.freehand) {
       // handle the exit point
       this.hoverOutImage(e);
       this.redraw();
@@ -506,7 +533,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.onMouseOver = function(e) {
     // mouse entering canvas
-    if (this.makingContour) {
+    if (this.makingContour && this.freehand) {
       // handle the entry point
       this.hoverOverImage(e);
       this.redraw();
@@ -1208,6 +1235,15 @@ function Segmenter(canvas, imageName, imagePath) {
     return res;
   }
 
+  this.discardContour = function() {
+    // discard the current contour
+    this.freehand = false;
+    this.makingContour = false;
+
+    this.contour = [];
+    this.redraw();
+  }
+
   this.finishContour = function() {
     // finish the contour, add it to the segmentation
     if (this.contour.length > 1) {
@@ -1227,10 +1263,8 @@ function Segmenter(canvas, imageName, imagePath) {
 
       this.invalidateOverlayRect(rect);
     }
-    this.makingContour = false;
 
-    this.contour = [];
-    this.redraw();
+    this.discardContour();
   }
 
   this.finishPainting = function() {
@@ -1639,6 +1673,7 @@ function Segmenter(canvas, imageName, imagePath) {
   canvas.addEventListener("mousemove", function(e) { return s.onMouseMoved(e); }, false);
   canvas.addEventListener("mouseout", function(e) { return s.onMouseOut(e); }, false);
   canvas.addEventListener("mouseover", function(e) { return s.onMouseOver(e); }, false);
+  canvas.addEventListener("dblclick", function(e) { return s.finishContour(); }, false);
 
 /*  canvas.addEventListener("blur", function() {
       setTimeout(function() {
