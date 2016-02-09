@@ -71,9 +71,7 @@ function selectTool(btn) {
   if (instance) {
     if (btn.id == 'brushbtn') {
       instance.selectMode('brush');
-    } /*else if (btn.id == 'erasebtn') {
-      instance.selectMode('eraser');
-    } */else {
+    } else {
       instance.selectMode('contour');
     }
   }
@@ -106,6 +104,9 @@ function Segmenter(canvas, imageName, imagePath) {
   this.undoPointer = -1;
   this.eraserOn = false;
   this.hoverOutPoint = Vector(0, 0);
+  this.curveSmoothFactor = 1.0;
+  this.minSmoothFactor = 0.0;
+  this.maxSmoothFactor = 100.0;
 
   //// member functions
   //// setup and flow control
@@ -133,12 +134,11 @@ function Segmenter(canvas, imageName, imagePath) {
         'sizevalue': document.getElementById('brushsize'),
         'span': document.getElementById('brushctrl')
       });
-/*    registerToolById('erasebtn', {
-        'sizeslider': document.getElementById('brushslider'),
-        'sizevalue': document.getElementById('brushsize'),
-        'span': document.getElementById('brushctrl')
-      });*/
-    registerToolById('polybtn');
+    registerToolById('polybtn', {
+        'smoothslider': document.getElementById('contourslider'),
+        'smoothvalue': document.getElementById('contoursize'),
+        'span': document.getElementById('contourctrl')
+      });
     selectTool(toolbox['polybtn']);
 
     // add click event for tag adding
@@ -1048,6 +1048,8 @@ function Segmenter(canvas, imageName, imagePath) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     this.invalidateOverlay();
+
+    this.selectMode('contour', true);
   }
 
   this.findBoundingRect = function(contour) {
@@ -1113,13 +1115,101 @@ function Segmenter(canvas, imageName, imagePath) {
     return rect;
   }
 
+  this.smoothCurve = function(contour, scale) {
+    // smooth the given polygon on the given scale
+    
+    // smoothing function: 0.5*(1 + cos(pi/2*x/s)) for x in [-2s, 2s]
+    // this vanishes at the edges, and is equal to 0.5 at x = s, 1.0 at x = 0
+    var max_dist = 2*scale;
+
+    // first transform the curve into a parametric form, with the distance
+    // along the curve as the parameter
+    var last_v = contour[0];
+
+    var d = [0];
+    for (var i = 1; i < contour.length; ++i) {
+      var crt_v = contour[i];
+      var dist = vnorm(vsub(crt_v, last_v));
+
+      d.push(d[i-1] + dist);
+
+      last_v = crt_v;
+    }
+
+    // calculate full length of curve
+    var clen = d[d.length - 1] + vnorm(vsub(last_v, contour[0]));
+
+    // next split the curve into buckets that can be used for adjacency calculation
+    var n_buckets = Math.floor(clen/max_dist) + 1;
+    var buckets = [];
+    for (var i = 0; i < n_buckets; ++i) {
+      buckets.push([]);
+    }
+    for (var i = 0; i < contour.length; ++i) {
+      buckets[Math.floor(d[i] / max_dist)].push(i);
+    }
+
+    // now start smoothing
+    // only interested in points within a distance max_dist
+    // that means we only have to look in the adjacent buckets
+    var res = [];
+    var curve_dist = function(k, l) { return (k>l ? d[k] - d[l] : d[l] - d[k]); };
+    // urgh! javascript modulo ('%') is negative for negative first argument!
+    var real_mod = function(a, b) { return ((a%b) + b)%b; };
+    for (var i = 0; i < contour.length; ++i) {
+      var ibucket = Math.floor(d[i] / max_dist);
+      var bucket = buckets[ibucket];
+      var lbucket = buckets[real_mod((ibucket - 1), n_buckets)];
+      var rbucket = buckets[real_mod((ibucket + 1), n_buckets)];
+
+      var neighbors = [];
+      for (var j = 0; j < bucket.length; ++j) {
+        // for these the distances are always < max_dist
+        neighbors.push(bucket[j]);
+      }
+      for (var j = 0; j < lbucket.length; ++j) {
+        if (curve_dist(i, lbucket[j]) < max_dist)
+          neighbors.push(lbucket[j]);
+      }
+      for (var j = 0; j < rbucket.length; ++j) {
+        if (curve_dist(i, rbucket[j]) < max_dist)
+          neighbors.push(rbucket[j]);
+      }
+
+      var smoothed = new Vector(0, 0);
+      var denom = 0;
+      // smoothing function: 0.5*(1 + cos(pi*x/max_dist))
+      for (var j = 0; j < neighbors.length; ++j) {
+        var k = neighbors[j];
+        var dist = curve_dist(i, k);
+        var f = 0.5*(1 + Math.cos(Math.PI*dist/max_dist));
+        smoothed = vadd(smoothed, vscale(f, contour[k]));
+        denom += f;
+      }
+      if (denom > 0)
+        smoothed = vscale(1.0/denom, smoothed);
+
+      res.push(smoothed);
+    }
+
+    return res;
+  }
+
   this.finishContour = function() {
     // finish the contour, add it to the segmentation
     this.makingContour = false;
     if (this.contour.length > 1) {
+      if (this.curveSmoothFactor > 0) {
+        // smooth the curve -- this removes jagged edges that are particularly jarring
+        // when selecting on the image when it's not full-size
+        this.contour = this.smoothCurve(this.contour,
+          window.devicePixelRatio*this.curveSmoothFactor/this.izoom.s);
+      }
+
       var rect = this.findBoundingRect(this.contour);
       this.registerUndo(this.segmentation, rect);
-      this.fillContour(this.segmentation.getContext("2d"), this.contour, ((this.eraserOn)?'erase':this.currentColor));
+      this.fillContour(this.segmentation.getContext("2d"), this.contour,
+        ((this.eraserOn)?'erase':this.currentColor));
       this.appendRedo(this.segmentation);
 
       this.invalidateOverlayRect(rect);
@@ -1184,14 +1274,15 @@ function Segmenter(canvas, imageName, imagePath) {
     return rect;
   }
 
-  this.selectMode = function(mode) {
-    if (this.drawMode != mode) {
+  this.selectMode = function(mode, force) {
+    if (this.drawMode != mode || force) {
       this.drawMode = mode;
       this.contour = [];
 
       if (mode == 'brush') {
         // the size slider is the same for the brush and the eraser
         toolprops['brushbtn']['span'].style.visibility = 'visible';
+        toolprops['polybtn']['span'].style.visibility = 'hidden';
         var slider = toolprops['brushbtn']['sizeslider'];
         var value = toolprops['brushbtn']['sizevalue'];
         var s = this;
@@ -1205,13 +1296,41 @@ function Segmenter(canvas, imageName, imagePath) {
         slider.min = this.minBrush;
         slider.max = this.maxBrush;
         this.setBrushSize(this.brushSize);
+      } else if (mode == 'contour') {
+        toolprops['polybtn']['span'].style.visibility = 'visible';
+        toolprops['brushbtn']['span'].style.visibility = 'hidden';
+        var slider = toolprops['polybtn']['smoothslider'];
+        var value = toolprops['polybtn']['smoothvalue'];
+        var s = this;
+        slider.addEventListener('change', function() {
+            s.setSmoothSize(slider.value);
+          });
+        value.addEventListener('change', function() {
+            s.setSmoothSize(value.value);
+          });
+
+        slider.min = this.minSmoothFactor;
+        slider.max = this.maxSmoothFactor;
+        this.setSmoothSize(this.curveSmoothFactor);
       } else {
+        toolprops['polybtn']['span'].style.visibility = 'hidden';
         toolprops['brushbtn']['span'].style.visibility = 'hidden';
       }
 
       this.updateMouseShape();
       this.redraw();
     }
+  }
+
+  this.setSmoothSize = function(size) {
+    this.curveSmoothFactor = Math.max(this.minSmoothFactor, Math.min(this.maxSmoothFactor, size));
+
+    var slider = toolprops['polybtn']['smoothslider'];
+    var value = toolprops['polybtn']['smoothvalue'];
+    slider.value = this.curveSmoothFactor;
+    value.value = slider.value;
+
+    canvas.focus();
   }
 
   this.setBrushSize = function(size) { 
@@ -1299,8 +1418,6 @@ function Segmenter(canvas, imageName, imagePath) {
     for (var i = 0; i < tag_items.length; ++i) {
       tag_items[i].classList.remove("selected");
     }
-
-//    document.getElementById('tageraser').classList.remove('selected');
 
     if (idx >= 0) {
       tag_items[idx].classList.add("selected");
@@ -1500,7 +1617,7 @@ function Segmenter(canvas, imageName, imagePath) {
   keyCollector.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
 //  keyCollector.addEventListener("keyup", function(e) { return s.onKeyUp(e); }, false);
 
-  document.addEventListener("click", function() { canvas.focus(); }, false);
+//  document.addEventListener("click", function() { canvas.focus(); }, false);
 
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("mousedown", function(e) { return s.onMouseDown(e); }, false);

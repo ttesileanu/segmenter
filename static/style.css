@@ -282,8 +282,8 @@ ul.folderlist li.fileitem a:hover
   background-size: cover;
   background-color: #FFF;
   cursor: pointer;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-color: #EEE;
   border: 1px outset;
   display: inline-block;
@@ -359,7 +359,7 @@ ul.folderlist li.fileitem a:hover
 {
   position: relative;
   width: 2.8em;
-  top: -12px;
+  top: -8px;
   text-align: center;
 }
 
@@ -378,18 +378,23 @@ ul.folderlist li.fileitem a:hover
   position: absolute;
 }
 
+#brushctrl
+{
+  position: absolute;
+  top: 4px;
+}
+
 #brushlabel
 {
   position: relative;
   left: 16px;
-  top: -12px;
+  top: -4px;
 }
 
 #brushslider
 {
   position: relative;
   left: 16px;
-  top: -8px;
 }
 
 #brushsize
@@ -397,7 +402,34 @@ ul.folderlist li.fileitem a:hover
   position: relative;
   width: 1.8em;
   left: 16px;
-  top: -12px;
+  top: -4px;
+}
+
+#contourctrl
+{
+  position: absolute;
+  top: 4px;
+}
+
+#contourlabel
+{
+  position: relative;
+  left: 16px;
+  top: -4px;
+}
+
+#contourslider
+{
+  position: relative;
+  left: 16px;
+}
+
+#contoursize
+{
+  position: relative;
+  width: 1.8em;
+  left: 16px;
+  top: -4px;
 }
 
 #segmenterapp
