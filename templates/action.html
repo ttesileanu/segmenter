@@ -5,6 +5,11 @@
   <div id="segmenterdiv">
     <canvas id="segmenter">Segmenter canvas</canvas>
   </div>
+  <div id="segmentersettings">
+    Save format:
+    <input type="radio" name="savetype" value="Matlab" checked>Matlab
+    <input type="radio" name="savetype" value="PNG">PNG
+  </div>
   <div id="segmenterctrl">
     <a class="segtool" id="polybtn"></a>
     <a class="segtool" id="brushbtn"></a>
@@ -44,6 +49,8 @@
       <a class="segtool" id="zoominbtn"></a>
       <input id="zoomlevel" type="text" />
       <a class="segtool" id="zoomoutbtn"></a>
+      &nbsp;
+      <a class="segtool" id="settingsbtn"></a>
     </span>
   </div>
   <script src="{{ url_for('static', filename='segmenter.js') }}"></script>

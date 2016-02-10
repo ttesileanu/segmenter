@@ -1861,6 +1861,22 @@ function Segmenter(canvas, imageName, imagePath) {
     });
   });
 
+  // register settings button
+  document.getElementById("segmentersettings").style.visibility = 'hidden';
+  document.getElementById("settingsbtn").addEventListener("click", function() {
+    var old_viz = document.getElementById("segmentersettings").style.visibility;
+    document.getElementById("segmentersettings").style.visibility =
+      (old_viz=='hidden')?'visible':'hidden';
+  });
+
+  // handle output format change
+  $('input[type=radio][name=savetype]').change(function() {
+    if (this.value == 'Matlab')
+      s.saveStyle = 'matlab_rle';
+    else if (this.value == 'PNG')
+      s.saveStyle = 'png';
+  });
+
   // start up the segmenter
   this.setup();
 }

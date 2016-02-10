@@ -373,6 +373,11 @@ ul.folderlist li.fileitem a:hover
   background-image: url('img/redo.png');
 }
 
+#settingsbtn
+{
+  background-image: url('img/settings.png');
+}
+
 #zoomundocontrols
 {
   position: absolute;
@@ -522,4 +527,11 @@ input.tag
 #plustag:active
 {
   margin: 1px;
+}
+
+#segmentersettings
+{
+  position: absolute;
+  visibility: hidden;
+  bottom: 6px;
 }
