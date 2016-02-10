@@ -109,6 +109,8 @@ function Segmenter(canvas, imageName, imagePath) {
   this.maxSmoothFactor = 25.0;
   this.freehand = false;
   this.closenessThreshold = 5.0;
+  this.saveStyle = 'matlab_rle';
+  this.saving = false;
 
   //// member functions
   //// setup and flow control
@@ -292,7 +294,7 @@ function Segmenter(canvas, imageName, imagePath) {
   //// event handlers
   this.onWheel = function(e) {
     // handle mouse wheel & pinch gesture events
-    if (!this.imageLoading && !this.imageError) {
+    if (!this.imageLoading && !this.imageError && !this.saving) {
       e.preventDefault();
       if (e.ctrlKey) {
         // pinch gesture -- zoom around mouse position
@@ -310,7 +312,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.onKeyPress = function(e) {
     // handle key presses
-    if (!this.imageLoading && !this.imageError) {
+    if (!this.imageLoading && !this.imageError && !this.saving) {
       key = String.fromCharCode(e.keyCode);
       // handle zooming
       if (key == '=' || key == '+') {
@@ -349,7 +351,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.onKeyDown = function(e) {
     // handle arrow keys
-    if (!this.imageLoading && !this.imageError) {
+    if (!this.imageLoading && !this.imageError && !this.saving) {
       var sx = 0;
       var sy = 0;
       var amt = 25;
@@ -376,6 +378,10 @@ function Segmenter(canvas, imageName, imagePath) {
         }
       } else if (e.keyCode == 13) {
         // finish path
+        // if not dragging, remove last point
+        if (!this.freehand && this.contour.length > 0)
+          this.contour.pop();
+
         this.finishContour();
       } else if (e.keyCode == 27) {
         // discard path
@@ -404,6 +410,9 @@ function Segmenter(canvas, imageName, imagePath) {
   }*/
 
   this.onMouseDown = function(e) {
+    if (this.imageLoading || this.imageError || this.saving)
+      return;
+    
     if (document.activeElement != canvas) {
       canvas.focus();
       return;
@@ -446,6 +455,10 @@ function Segmenter(canvas, imageName, imagePath) {
       canvas.style.cursor = 'pointer';
       return;
     }
+    if (this.saving) {
+      canvas.style.cursor = 'wait';
+      return;
+    }
     if (this.isInImage(m)) {
       if (this.drawMode == 'brush') {
         canvas.style.cursor = 'none';
@@ -459,6 +472,8 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.onMouseMoved = function(e) {
     // contour making or simply changing pointer shape
+    if (this.imageLoading || this.imageError || this.saving)
+      return;
     var m = this.extractMousePosition(e);
     this.setMouse(m);
     if (this.makingContour) {
@@ -495,13 +510,15 @@ function Segmenter(canvas, imageName, imagePath) {
   }
 
   this.onMouseUp = function(e) {
+    if (this.imageLoading || this.imageError || this.saving)
+      return;
     var m = this.extractMousePosition(e);
     this.setMouse(m);
     if (this.makingContour) {
       var cm = this.canvasToImage(m);
 
       var cthresh = this.closenessThreshold*window.devicePixelRatio/this.izoom.s;
-      if (this.contour.length > 0) {
+      if (this.contour.length > 1) {
         if (vnorm(vsub(cm, this.contour[0])) < cthresh) {
           // have this equivalent to closing the contour
           this.finishContour();
@@ -509,6 +526,8 @@ function Segmenter(canvas, imageName, imagePath) {
         }
       }
       this.contour.push(this.canvasToImage(m));
+      if (this.contour.length < 2)
+        this.contour.push(this.contour[0]);
       this.freehand = false;
       this.redraw();
     } else if (this.painting) {
@@ -521,6 +540,8 @@ function Segmenter(canvas, imageName, imagePath) {
   }
 
   this.onMouseOut = function(e) {
+    if (this.imageLoading || this.imageError || this.saving)
+      return;
     // mouse exiting canvas
     if (this.makingContour && this.freehand) {
       // handle the exit point
@@ -532,6 +553,8 @@ function Segmenter(canvas, imageName, imagePath) {
   }
 
   this.onMouseOver = function(e) {
+    if (this.imageLoading || this.imageError || this.saving)
+      return;
     // mouse entering canvas
     if (this.makingContour && this.freehand) {
       // handle the entry point
@@ -598,7 +621,10 @@ function Segmenter(canvas, imageName, imagePath) {
                          new Vector(win[1], win[3]),     // between bottom and right edges (1 -- 2)
                          new Vector(win[1], win[2]),     // between right and top edges (2 -- 3)
                          new Vector(win[0], win[2])];    // between left and top edges (3 -- 0)
-          var min_edge = Math.min(new_edge, old_edge);
+          var min_edge = old_edge;
+          if ((min_edge + 1) % 4 != new_edge && (min_edge + 2) % 4 != new_edge) {
+            min_edge = new_edge;
+          }
           // always going around at least a single corner, since old_edge != new_edge
           this.contour.push(this.canvasToImage(corners[min_edge]));
           if (Math.abs(new_edge - old_edge) == 2) {
@@ -620,7 +646,7 @@ function Segmenter(canvas, imageName, imagePath) {
     var ctx = canvas.getContext("2d");
 
     // clear everything
-      ctx.fillStyle = this.imageLoading?"#DDD":"#FFF";
+    ctx.fillStyle = this.imageLoading?"#DDD":"#FFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // handle loading/error
@@ -663,10 +689,31 @@ function Segmenter(canvas, imageName, imagePath) {
       ctx.stroke();
     }
 
+    if (this.saving) {
+      this.drawSavingMessage(ctx);
+    }
+
     this.noLoop();
   }
 
   //// drawing functions
+  this.drawSavingMessage = function(ctx) {
+    // draw a "saving..." message
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    var size = 50.0;
+    ctx.font = "50px Arial Black";
+    ctx.fillStyle = "#FFFFFF";
+    
+    // write the text
+    var text = "saving...";
+    var width = ctx.measureText(text).width;
+    var tx = (canvas.width - width)/2;
+    var ty = canvas.height/2;
+    ctx.fillText(text, tx, ty);
+  }
+
   this.drawErrorMessage = function(ctx) {
     // draw message showing that image couldn't be loaded
     var size = 50.0;
@@ -964,21 +1011,30 @@ function Segmenter(canvas, imageName, imagePath) {
 
   this.drawContour = function(ctx) {
     // draw the currently selected/selecting contour
-    ctx.beginPath();
-    var i;
-    for (i = 0; i < this.contour.length; ++i) {
-      var p = this.imageToCanvas(this.contour[i]);
-      if (i == 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.strokeStyle = "#FFF";
-    ctx.lineWidth = 3;
     if (this.makingContour) {
+      ctx.beginPath();
+      var i;
+      var omit = this.freehand?0:1;
+      for (i = 0; i < this.contour.length - omit; ++i) {
+        var p = this.imageToCanvas(this.contour[i]);
+        if (i == 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.strokeStyle = "#FFF";
+      ctx.lineWidth = 3;
       ctx.stroke();
-    } else {
-      ctx.fillStyle = "rgba(128, 32, 32, 0.25)";
-      ctx.fill();
-      ctx.stroke();
+
+      if (!this.freehand && this.contour.length >= 2) {
+        ctx.beginPath();
+        n = this.contour.length;
+        var p1 = this.imageToCanvas(this.contour[n-2]);
+        var p2 = this.imageToCanvas(this.contour[n-1]);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = "#EEE";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
   }
 
@@ -1315,9 +1371,6 @@ function Segmenter(canvas, imageName, imagePath) {
     var rect = this.fillContour(this.segmentation.getContext("2d"), contour, erase?'erase':this.currentColor);
 
     this.invalidateOverlayRect(rect);
-
-    // need to recalculate the overlay, but we don't want to slow things down by doing it too often
-//    this.invalidateOverlay(50);
   
     return rect;
   }
@@ -1485,14 +1538,15 @@ function Segmenter(canvas, imageName, imagePath) {
     map = [];
     var tag_list = document.getElementById('taglistobj');
     var tag_items = tag_list.getElementsByTagName('li');
-    for (var i = 0; i < tag_items.length; ++i) {
+    // skip eraser!
+    for (var i = 1; i < tag_items.length; ++i) {
       var item = tag_items[i];
       var input = item.children[0];
       var swatch = item.children[1];
 
       var tag = input.value;
       // XXX this is a little fragile
-      var color = color_cycle[i];
+      var color = color_cycle[i-1];
 
       map.push([tag, color]);
     }
@@ -1571,7 +1625,6 @@ function Segmenter(canvas, imageName, imagePath) {
       var region = crtUndo.region;
 
       var ctx = this.segmentation.getContext("2d");
-      var old = ctx.globalCompositeOperation;
       ctx.clearRect(region.x, region.y, region.w, region.h);
       ctx.drawImage(crtUndo.before, region.x, region.y);
 
@@ -1592,7 +1645,6 @@ function Segmenter(canvas, imageName, imagePath) {
       var region = crtUndo.region;
 
       var ctx = this.segmentation.getContext("2d");
-      var old = ctx.globalCompositeOperation;
       ctx.clearRect(region.x, region.y, region.w, region.h);
       ctx.drawImage(crtUndo.after, region.x, region.y);
 
@@ -1624,6 +1676,64 @@ function Segmenter(canvas, imageName, imagePath) {
     this.selectTag(-1);
     document.getElementById('tageraser').classList.add('selected');
     this.eraserOn = true;
+  }
+
+  this.segToList = function() {
+    // convert the segmentation to a matrix of integers identifying the tags
+//    var t0 = Date.now();
+    var ctx = this.segmentation.getContext("2d");
+    var segImData = ctx.getImageData(0, 0, this.image.width, this.image.height);
+    var segData = segImData.data;
+
+    var res = [];
+    var crt = 0;
+
+    // turn the color cycle into an associative array, for speed
+    // start with #000000 -> 0
+    var assoc = {0: 0};
+    for (var i = 0; i < color_cycle.length; ++i) {
+      var color = parseInt('0x' + color_cycle[i].slice(1))
+      assoc[color] = i + 1;
+    }
+
+    var npx = this.image.width*this.image.height;
+    for (var i = 0; i < npx; ++i) {
+      var r = segData[crt];
+      var g = segData[crt+1];
+      var b = segData[crt+2];
+      crt += 4;
+
+      var color = b + (g << 8) + (r << 16);
+      res.push(assoc[color] || 0);
+    }
+
+/*    var t1 = Date.now();
+    document.getElementById("temp").textContent = t1 - t0;*/
+
+    return res;
+  }
+
+  this.doRle = function(v) {
+    // RLE encode the array
+    // the output is an array formed by pairs (n, x), meaning
+    // n elements with value x
+    var res = [];
+
+    var n = v.length;
+    var i = 0;
+    while (i < n) {
+      var x = v[i++];
+      var k = 1;
+      while (i < n && v[i] == x) {
+        ++k;
+        ++i;
+      }
+
+      res.push(k);
+      res.push(x);
+    }
+
+    return res;
   }
 
   //// initialization
@@ -1665,6 +1775,29 @@ function Segmenter(canvas, imageName, imagePath) {
   keyCollector.addEventListener("keydown", function(e) { return s.onKeyDown(e); }, false);
 //  keyCollector.addEventListener("keyup", function(e) { return s.onKeyUp(e); }, false);
 
+  document.addEventListener("keydown", function(e) {
+    var doPrevent = false;
+    if (e.keyCode == 8 || e.keyCode == 46) {
+      var d = event.srcElement || event.target;
+      if ((d.tagName.toUpperCase() === 'INPUT' &&
+            (d.type.toUpperCase() === 'TEXT' ||
+             d.type.toUpperCase() === 'PASSWORD' ||
+             d.type.toUpperCase() === 'FILE' ||
+             d.type.toUpperCase() === 'SEARCH' ||
+             d.type.toUpperCase() === 'EMAIL' ||
+             d.type.toUpperCase() === 'NUMBER' ||
+             d.type.toUpperCase() === 'DATE')
+          ) || d.tagName.toUpperCase() === 'TEXTAREA')
+      {
+        doPrevent = d.readOnly || d.disabled;
+      } else {
+        doPrevent = true;
+      }
+    }
+    if (doPrevent) 
+      e.preventDefault();
+  });
+
 //  document.addEventListener("click", function() { canvas.focus(); }, false);
 
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
@@ -1688,23 +1821,43 @@ function Segmenter(canvas, imageName, imagePath) {
   // register SAVE action
   $(function() {
     $('#savebtn').click(function() {
-      // XXX make sure that the segmentation is up to date
-      var segURL = s.segmentation.toDataURL();
-      var tagMap = s.getTagMap();
-      $.ajax({
-        type: 'POST',
-        url: $SCRIPT_ROOT + "/save",
-        data: {
-          image: segURL,
-          imageName: s.imagePath,
-          tags: JSON.stringify(tagMap)
+//      var t0 = Date.now();
+      s.saving = true;
+      s.redraw();
+      s.updateMouseShape();
+      setTimeout(function() {
+        if (s.saveStyle == 'png') {
+          var segURL = s.segmentation.toDataURL();
+        } else if (s.saveStyle == 'matlab') {
+          var segMat = s.segToList();
+          var segURL = JSON.stringify(segMat);
+        } else if (s.saveStyle == 'matlab_rle') {
+          var segMat = s.segToList();
+          var segMatRle = s.doRle(segMat);
+          var segURL = JSON.stringify(segMatRle);
         }
-/*        data: {
-          imgBase64: segURL
-        }*/
-        // XXX add a success handler that shows that changes were saved
-      });
-      canvas.focus();
+        var tagMap = s.getTagMap();
+        $.ajax({
+          type: 'POST',
+          url: $SCRIPT_ROOT + "/save",
+          data: {
+            image: segURL,
+            width: s.image.width,
+            height: s.image.height,
+            imageName: s.imagePath,
+            tags: JSON.stringify(tagMap),
+            style: s.saveStyle
+          },
+          success: function() {
+            s.saving = false;
+            s.redraw();
+            s.updateMouseShape();
+//            var t1 = Date.now();
+//            document.getElementById("temp").innerText = (t1 - t0)/1000.0;
+          }
+        });
+        canvas.focus();
+      }, 1);
     });
   });
 
@@ -1722,5 +1875,4 @@ var instance;
 var canvas = document.getElementById("segmenter");
 var toolbox = {};
 var toolprops = {};
-var color_cycle = ['#FF0000', '#0000FF', '#00FF00', '#FFA000', '#BBBB22', '#FF00FF', '#00FFFF', '#FFFFFF',
-                   '#000000'];
+var color_cycle = ['#FF0000', '#0000FF', '#00FF00', '#B08000', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'];

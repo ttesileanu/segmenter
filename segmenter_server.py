@@ -5,12 +5,10 @@ import ctypes
 import flask
 import base64
 import json
+import time
 
-#import matplotlib as mpl
-#mpl.use('Agg')
-
-#import matplotlib.pyplot as plt
-#import seaborn as sns
+import numpy as np
+from scipy.io import savemat
 
 app = Flask(__name__)
 
@@ -50,19 +48,48 @@ def parseDict(form, base):
 @app.route('/save', methods=['GET', 'POST'])
 def save_file():
   if request.method == 'POST':
-    segmentation = str(request.form['image'])
-    segmentation = segmentation[segmentation.find(',')+1:]
+    segmentation = request.form['image']
+    segmentation = str(segmentation)
+    tags = json.loads(request.form['tags'])
     name = str(request.form['imageName'])
     root, ext = os.path.splitext(name)
-    seg_name = root + '_segmented.png'
-    with open(seg_name, 'wb') as f:
-      f.write(base64.b64decode(segmentation))
+    style = request.form['style']
 
-    tags = json.loads(request.form['tags'])
-    tag_name = root + '_segmented.txt'
-    with open(tag_name, 'w') as f:
-      for crt_tag in tags:
-        f.write(crt_tag[0] + ': ' + crt_tag[1] + '\n')
+    if style == 'png':
+      segmentation = segmentation[segmentation.find(',')+1:]
+      segmentation_decoded = base64.b64decode(segmentation)
+
+      seg_name = root + '_segmented.png'
+      with open(seg_name, 'wb') as f:
+        f.write(segmentation_decoded)
+
+      tag_name = root + '_segmented.txt'
+      with open(tag_name, 'w') as f:
+        for crt_tag in tags:
+          f.write(crt_tag[0] + ': ' + crt_tag[1] + '\n')
+
+    elif style == 'matlab' or style == 'matlab_rle':
+      width = int(request.form['width'])
+      height = int(request.form['height'])
+      if style == 'matlab':
+        seg_list = np.asarray(json.loads(segmentation), dtype='int8')
+      else:
+        seg_rle = json.loads(segmentation)
+
+        seg_list = np.zeros(width*height)
+        k = 0;
+        for i in xrange(0, len(seg_rle), 2):
+          count = seg_rle[i]
+          x = seg_rle[i+1]
+          seg_list[k:k+count] = x
+          k += count
+
+      seg_list = np.reshape(seg_list, (height, width))
+
+      mat_name = root + '_segmented.mat'
+      tag_keys = [_[0] for _ in tags]
+      savemat(mat_name, {'segmentation': seg_list, 'tags': np.asarray(tag_keys,
+        dtype=np.object)})
 
     return ('', 204)
 
