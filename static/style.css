@@ -441,6 +441,8 @@ ul.folderlist li.fileitem a:hover
 {
   position: relative;
   overflow: auto;
+  margin: 5px;
+  padding: 3px;
   -webkit-user-select: none; /* webkit (safari, chrome) browsers */
   -moz-user-select: none; /* mozilla browsers */
   -khtml-user-select: none; /* webkit (konqueror) browsers */
@@ -450,7 +452,7 @@ ul.folderlist li.fileitem a:hover
 #segmenterctrl
 {
   position: absolute;
-  top: 0px;
+  top: 3px;
   width: 330px;
   margin-left: 10px;
 }

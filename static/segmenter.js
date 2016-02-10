@@ -1181,7 +1181,7 @@ function Segmenter(canvas, imageName, imagePath) {
       var vi, vj = contour[j];
       for (i = 0; i < contour.length; ++i) {
         vi = contour[i];
-        if (vi.y < y && vj.y >= y || vj.y < y && vi.y >= y)
+        if (vi.y <= y && vj.y >= y || vj.y <= y && vi.y >= y)
           inters.push(vi.x + (y - vi.y)*(vj.x - vi.x)/(vj.y - vi.y));
         j = i;
         vj = vi;
