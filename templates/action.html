@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
-<h3 id="imgtitle">{{ image_name }}   <span id="imgsize" style="color: #999;"></span></h3>
+<h3 id="imgtitle">{{ image_name }}   <span id="imgsize" style="color: #999;"></span><span id="imgeffects"></span><span class="imgeffect" id="invertedimg"><span id="invertedimgicon"></span>&nbsp;inverted</span><span class="imgeffect" id="brightimg"><span id="brightimgicon"></span>&nbsp;brightened</span><span class="imgeffect" id="nosegments"><span id="nosegicon"></span>&nbsp;no segmentation</span></h3>
 <div id="segmenterapp">
   <div id="segmenterdiv">
     <canvas id="segmenter">Segmenter canvas</canvas>

@@ -111,6 +111,11 @@ function Segmenter(canvas, imageName, imagePath) {
   this.closenessThreshold = 5.0;
   this.saveStyle = 'matlab_rle';
   this.saving = false;
+  this.hideSegmentation = false;
+  this.invertImage = false;
+  this.invertedImage = null;
+  this.brightenImage = false;
+  this.brighterImage = null;
 
   //// member functions
   //// setup and flow control
@@ -118,6 +123,10 @@ function Segmenter(canvas, imageName, imagePath) {
     this.imageLoading = true;
     this.imageLoaded = false;
     this.imageError = false;
+
+    document.getElementById("invertedimg").style.visibility = 'hidden';
+    document.getElementById("brightimg").style.visibility = 'hidden';
+    document.getElementById("nosegments").style.visibility = 'hidden';
 
     // start loading the image, set up handlers
     this.image = new Image();
@@ -310,6 +319,33 @@ function Segmenter(canvas, imageName, imagePath) {
     }
   }
 
+  this.doInvertImage = function() {
+    this.invertImage = !this.invertImage;
+    if (this.invertImage) this.brightenImage = false;
+    if (this.invertImage) {
+      document.getElementById("invertedimg").style.visibility = 'visible';
+      document.getElementById("brightimg").style.visibility = 'hidden';
+    } else {
+      document.getElementById("invertedimg").style.visibility = 'hidden';
+    }
+  }
+
+  this.doBrightenImage = function() {
+    this.brightenImage = !this.brightenImage;
+    if (this.brightenImage) this.invertImage = false;
+    if (this.brightenImage) {
+      document.getElementById("invertedimg").style.visibility = 'hidden';
+      document.getElementById("brightimg").style.visibility = 'visible';
+    } else {
+      document.getElementById("brightimg").style.visibility = 'hidden';
+    }
+  }
+
+  this.doHideSegmentation = function() {
+    this.hideSegmentation = !this.hideSegmentation;
+    document.getElementById("nosegments").style.visibility = this.hideSegmentation?'visible':'hidden';
+  }
+
   this.onKeyPress = function(e) {
     // handle key presses
     if (!this.imageLoading && !this.imageError && !this.saving) {
@@ -330,6 +366,21 @@ function Segmenter(canvas, imageName, imagePath) {
       } else if (key == '1') {
         this.doZoom(-1);
         return false;
+      } else if (key == 's') {
+        this.doHideSegmentation();
+        this.invalidateOverlay();
+        this.redraw();
+        return false;
+      } else if (key == 'i') {
+        this.doInvertImage();
+        this.invalidateOverlay();
+        this.redraw();
+        return false;
+      } else if (key == 'b') {
+        this.doBrightenImage();
+        this.invalidateOverlay();
+        this.redraw();
+        return false;
       }
       if (this.drawMode == 'brush') {
         if (key == '[') {
@@ -340,11 +391,7 @@ function Segmenter(canvas, imageName, imagePath) {
           this.setBrushSize(this.brushSize + 1);
           this.updateMouseShape();
           return false;
-        }/* else if (key == 'x') {
-          this.invalidateOverlay();
-          this.redraw();
-          return false;
-        }*/
+        }
       }
     }
   }
@@ -900,6 +947,52 @@ function Segmenter(canvas, imageName, imagePath) {
 
     return tempCanvas;
   }
+  
+  this.createInvertedImage = function() {
+    var img = this.scaleCropImage(this.image);
+    var ctx = img.getContext("2d");
+    var imgDataObj = ctx.getImageData(0, 0, this.image.width, this.image.height);
+    var imgData = imgDataObj.data;
+    var npx = this.image.width*this.image.height;
+    var crt = 0;
+    for (var i = 0; i < npx; ++i) {
+      imgData[crt] = 255 - imgData[crt++];
+      imgData[crt] = 255 - imgData[crt++];
+      imgData[crt] = 255 - imgData[crt++];
+      imgData[crt] = imgData[crt++];  // keep the alpha
+    }
+
+    ctx.putImageData(imgDataObj, 0, 0);
+
+    return img;
+  }
+
+  this.createBrighterImage = function() {
+    var img = this.scaleCropImage(this.image);
+    var ctx = img.getContext("2d");
+    var imgDataObj = ctx.getImageData(0, 0, this.image.width, this.image.height);
+    var imgData = imgDataObj.data;
+    var npx = this.image.width*this.image.height;
+    var crt = 0;
+    var brighten = function(x, amt) {
+      return Math.round(255.0*Math.pow(x/255.0, amt));
+    };
+    var map = [];
+    amt = 0.5;
+    for (var i = 0; i < 256; ++i) {
+      map.push(brighten(i, amt));
+    }
+    for (var i = 0; i < npx; ++i) {
+      imgData[crt] = map[imgData[crt++]];
+      imgData[crt] = map[imgData[crt++]];
+      imgData[crt] = map[imgData[crt++]];
+      imgData[crt] = imgData[crt++];  // keep the alpha
+    }
+
+    ctx.putImageData(imgDataObj, 0, 0);
+
+    return img;
+  }
 
   this.updateOverlay = function() {
     // update the overlay of image+segmentation
@@ -907,6 +1000,8 @@ function Segmenter(canvas, imageName, imagePath) {
       var date = new Date();
       if (date.getTime() >= this.invalidateAt) {
         this.invalidateOverlay();
+        this.updateOverlay();
+        return;
       }
     }
     if (!this.overlayValid) {
@@ -923,13 +1018,27 @@ function Segmenter(canvas, imageName, imagePath) {
       invY1 = Math.floor(invY1/maxFactor)*maxFactor;
       invY2 = Math.ceil(invY2/maxFactor)*maxFactor;
 
+      if (this.invertImage) {
+        if (this.invertedImage === null)
+          this.invertedImage = this.createInvertedImage();
+        var img = this.invertedImage;
+      } else if (this.brightenImage) {
+        if (this.brighterImage === null)
+          this.brighterImage = this.createBrighterImage();
+        var img = this.brighterImage;
+      } else {
+        var img = this.image;
+      }
+
       if (invX1 <= 0 && invY1 <= 0 && invX2 >= this.image.width && invY2 >= this.image.height) {
         // everything is invalidated
-        this.overlay = this.scaleCropImage(this.image);
+        this.overlay = this.scaleCropImage(img);
 
-        var ctx = this.overlay.getContext("2d");
-        ctx.globalCompositeOperation = "lighter";
-        ctx.drawImage(this.segmentation, 0, 0);
+        if (!this.hideSegmentation) {
+          var ctx = this.overlay.getContext("2d");
+          ctx.globalCompositeOperation = "lighter";
+          ctx.drawImage(this.segmentation, 0, 0);
+        }
 
         this.overlay_mipmaps = this.createMipmaps(this.overlay, this.nMipmaps);
 
@@ -938,11 +1047,13 @@ function Segmenter(canvas, imageName, imagePath) {
         // only a certain rectangle was invalidated
         var invW = invX2 - invX1;
         var invH = invY2 - invY1;
-        var changed = this.scaleCropImage(this.image, invX1, invY1, invW, invH);
+        var changed = this.scaleCropImage(img, invX1, invY1, invW, invH);
 
-        var ctx = changed.getContext("2d");
-        ctx.globalCompositeOperation = "lighter";
-        ctx.drawImage(this.segmentation, invX1, invY1, invW, invH, 0, 0, invW, invH);
+        if (!this.hideSegmentation) {
+          var ctx = changed.getContext("2d");
+          ctx.globalCompositeOperation = "lighter";
+          ctx.drawImage(this.segmentation, invX1, invY1, invW, invH, 0, 0, invW, invH);
+        }
 
         // create mipmaps of the changed section
         this.changed_mipmaps = this.createMipmaps(changed, this.nMipmaps);
