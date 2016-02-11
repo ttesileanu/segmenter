@@ -16,7 +16,7 @@ Python requirements:
 Browser requirements:
   - tested on Chrome 48 and Safari 9
 
-The app generates 5-6 full-size canvases, so if working on large images, the memory needs can be quite large (an 18MP image takes up over 70MB of memory). Undo levels are stored uncompressed, but only for the rectangular portion of the image that was modified. 
+The app generates 5-6 full-size canvases, so if working on large images, the memory needs can be quite large (for an 18MP image, *each* of the canvases takes up over 70MB of memory). Undo levels are stored uncompressed, but only for the rectangular portion of the image that was modified. 
 
 ## Installation
 
