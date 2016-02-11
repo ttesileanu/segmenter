@@ -90,11 +90,13 @@ The file extension in this case is '.mat'.
 
 By pressing the settings icon in the bottom-right of the canvas, you can choose a different saving method: as a PNG file. The app actually creates two files:
   * a text file, with extension '.txt', containing the mapping between pixel colors and tags; this is of the form:
+
     foreground: #FF0000
     object1: #0000FF
     object2: #00FF00
     object3: #B08000
     object4: #FFFF00
+
   * an image file in PNG format, with extension '.png', storing the segmentation.
 
 ### Tricks
