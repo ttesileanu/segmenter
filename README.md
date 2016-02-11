@@ -25,7 +25,7 @@ Assuming you have a running installation of Python
   * Numpy (http://www.numpy.org/ or pip install numpy), and
   * Scipy (http://www.scipy.org/ or pip install scipy).
 
-Then you can just start the server by running the segmenter\_sever.py script. The app can be accessed at http://localhost:5000/.
+Then you can just start the server by running the `segmenter\_sever.py` script. The app can be accessed at http://localhost:5000/.
 
 ## Using the app
 
@@ -40,7 +40,7 @@ Standard controls can be used to navigate through the image:
   * pinch gestures (when supported) or mouse wheel scrolls while the `CTRL` key is pressed zoom in and out around the current location of the mouse
   * scrolling can also be achieved using the arrow keys
   * zooming can also be achieved using `=` or `+` for zooming in and `-` for zooming out
-  * another way to zoom is by using the zoom icons at the bottom-right of the image, or by entering a zoom amount ('53%' or '53' both work)
+  * another way to zoom is by using the zoom icons at the bottom-right of the image, or by entering a zoom amount (`53%` or `53` both work)
   * pressing the `0` key zooms the image so that it fits inside the segmenter's canvas
   * pressing the `1` key zooms into the image to its full size (so that each displayed pixel matches an image pixel)
 
@@ -61,14 +61,14 @@ To fine-tune the tag masks, the brush tool can be used. The slider located on th
 #### The tags
 
 Tags are used to identify the segments in the figure. They have a name and an associated color. The app starts off with two tags
-  * the 'eraser', which is a special tag that can be used to erase parts of the mask
-  * a tag called 'foreground'
+  * the `eraser`, which is a special tag that can be used to erase parts of the mask
+  * a tag called `foreground`
 
 Select a tag by clicking on it (either the name or the color swatch work).
 
 To rename a tag, double click on its name (this won't work for the eraser).
 
-To add a tag, click the '+' button below the last tag. It is not currently possible to delete a tag (though you can remove all of its pixels from the segmentation).
+To add a tag, click the `+` button below the last tag. It is not currently possible to delete a tag (though you can remove all of its pixels from the segmentation).
 
 #### Undo/redo
 
@@ -76,37 +76,37 @@ Unlimited undo and redo are possible (limits do in fact exist -- currently set t
 
 ### Saving to file
 
-Press the floppy-disk icon on the bottom-left of the canvas to save the segmentation. This can take a second or two. The name of the file where the segmentation is saved is obtained by removing the extension from the image file and adding '\_segmented' and an extension (see below) to it. This is saved in the same folder as the original image.
+Press the floppy-disk icon on the bottom-left of the canvas to save the segmentation. This can take a second or two. The name of the file where the segmentation is saved is obtained by removing the extension from the image file and adding `\_segmented` and an extension (see below) to it. This is saved in the same folder as the original image.
 
 #### Matlab format
 
 By default, the app saves the segmentation as a Matlab file containing two variables:
-  * 'tags' -- a cell array with the names of the tags
-  * 'segmentation' -- an integer matrix of the same size as the image, in which each element indicates which of the tags the corresponding pixel belongs to (with zeros indicating regions that were not tagged).
+  * `tags` -- a cell array with the names of the tags
+  * `segmentation` -- an integer matrix of the same size as the image, in which each element indicates which of the tags the corresponding pixel belongs to (with zeros indicating regions that were not tagged).
 
-The file extension in this case is '.mat'.
+The file extension in this case is `.mat`.
 
 #### PNG format
 
 By pressing the settings icon in the bottom-right of the canvas, you can choose a different saving method: as a PNG file. The app actually creates two files:
-  * a text file, with extension '.txt', containing the mapping between pixel colors and tags; this is of the form:
+  * a text file, with extension `.txt`, containing the mapping between pixel colors and tags; this is of the form:
 
-    foreground: #FF0000
-    object1: #0000FF
-    object2: #00FF00
-    object3: #B08000
-    object4: #FFFF00
+        foreground: #FF0000
+        object1: #0000FF
+        object2: #00FF00
+        object3: #B08000
+        object4: #FFFF00
 
-  * an image file in PNG format, with extension '.png', storing the segmentation.
+  * an image file in PNG format, with extension `.png`, storing the segmentation.
 
 ### Tricks
 
 1. Remember that the segmentation is a single canvas. That means that if you have overlapping objects, you can select the lower one first, and then draw the top one over it.
 
 2. Sometimes the image is hard to see, especially if some tags have already been drawn on top of it. Here are a few keyboard shortcuts that can help:
-  * pressing 's' will hide or show the segmentation
-  * pressing 'i' will invert the colors in the image
-  * pressing 'b' will brighten the image
+  * pressing `s` will hide or show the segmentation
+  * pressing `i` will invert the colors in the image
+  * pressing `b` will brighten the image
 
 ## Suggestions?
 
