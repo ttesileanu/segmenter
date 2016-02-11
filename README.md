@@ -25,7 +25,7 @@ Assuming you have a running installation of Python
   * Numpy (http://www.numpy.org/ or pip install numpy), and
   * Scipy (http://www.scipy.org/ or pip install scipy).
 
-Then you can just start the server by running the `segmenter\_sever.py` script. The app can be accessed at http://localhost:5000/.
+Then you can just start the server by running the `segmenter_sever.py` script. The app can be accessed at http://localhost:5000/.
 
 ## Using the app
 
