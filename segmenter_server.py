@@ -14,7 +14,6 @@ app = Flask(__name__)
 
 base_path = os.path.expanduser('~')
 start_path = os.getcwd()
-#start_path = "Pictures/2014-01-20"
 
 @app.route('/')
 def index():
@@ -76,7 +75,7 @@ def save_file():
       else:
         seg_rle = json.loads(segmentation)
 
-        seg_list = np.zeros(width*height)
+        seg_list = np.zeros(width*height, dtype='int8')
         k = 0;
         for i in xrange(0, len(seg_rle), 2):
           count = seg_rle[i]
@@ -155,4 +154,4 @@ def has_hidden_attribute(filepath):
     return result
 
 if __name__ == '__main__':
-  app.run(debug=True)
+  app.run()
