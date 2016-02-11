@@ -110,9 +110,15 @@ class File(object):
     self.name = name
     self.path = path
 
+def isSameFile(path1, path2):
+  try:
+    return os.path.samefile(path1, path2)
+  except:
+    return os.stat(path1) == os.stat(path2)
+
 def getFolderContents(path):
   path = os.path.join(base_path, path)
-  if not os.path.samefile(path, base_path):
+  if not isSameFile(path, base_path):
     folders = [File(name='..', path=
         os.path.relpath(os.path.join(path, '..'), base_path))]
   else:

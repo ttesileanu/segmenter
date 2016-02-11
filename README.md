@@ -21,11 +21,23 @@ The app generates 5-6 full-size canvases, so if working on large images, the mem
 ## Installation
 
 Assuming you have a running installation of Python
-  * get Flask (http://flask.pocoo.org/ or pip install Flask),
-  * Numpy (http://www.numpy.org/ or pip install numpy), and
-  * Scipy (http://www.scipy.org/ or pip install scipy).
+  * get Flask (http://flask.pocoo.org/ or `pip install Flask`),
+  * Numpy (http://www.numpy.org/ or `pip install numpy`), and
+  * Scipy (http://www.scipy.org/ or `pip install scipy`).
 
 Then you can just start the server by running the `segmenter_sever.py` script. The app can be accessed at http://localhost:5000/.
+
+## Installation on Windows
+
+For Windows, installation of Python and the required Python packages is non-trivial, particularly because of NumPy and SciPy. There are two basic approaches:
+  * Using a 'meta-package' such as Anaconda (https://www.continuum.io/downloads) or WinPython (http://winpython.github.io/). Other options can be found at http://www.scipy.org/install.html. These are easy to install and come pre-packaged with NumPy and SciPy and many other goodies. They are a good choice if you know you may be using Python for other purposes as well. The downside is that these distributions are large (1-2GB).
+  * Installing Python from https://www.python.org/downloads/, then installing NumPy from https://sourceforge.net/projects/numpy/files/NumPy/ (currently only versions 1.10.2 and earlier have Windows installers) and SciPy from https://sourceforge.net/projects/scipy/files/scipy/. Make sure to select the "Add python.exe to the Path" option when installing Python.
+
+Regardless which option you choose, make sure to choose the Python 2.7 version (not 3.x).
+
+Once these are installed, you can get Flask by running a Terminal (Windows+R and type "cmd" in the window that opens), and running `pip install Flask` in it. If this complains that `pip` cannot be found, then you may need to run `pip install Flask` in the directory where your Python executables are installed. Consult the documentation to figure out where that is.
+
+Having installed Python, NumPy, SciPy, and Flask, you can download and unzip the image segmenter from GitHub, and double-click the `segmenter_server` script to run the server. The webapp can be accessed from a browser at `localhost:5000`, just like on Unix machines. Note that Internet Explorer 8 or older will not work -- please upgrade to a newer version, or install another browser, such as Google Chrome or Mozilla Firefox.
 
 ## Using the app
 
