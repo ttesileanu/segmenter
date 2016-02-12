@@ -424,37 +424,32 @@ function Segmenter(canvas, imageName, imagePath) {
           return false;
         }
       } else if (e.keyCode == 13) {
-        // finish path
-        // if not dragging, remove last point
-        if (!this.freehand && this.contour.length > 0)
-          this.contour.pop();
+        if (this.makingContour) {
+          // finish path
+          // if not dragging, remove last point
+          if (!this.freehand && this.contour.length > 0)
+            this.contour.pop();
 
-        this.finishContour();
+          this.finishContour();
+        }
+        e.preventDefault();
+        return false;
       } else if (e.keyCode == 27) {
-        // discard path
-        this.discardContour();
-      }/* else {
-        document.getElementById("temp_ctrl").innerHTML = (e.ctrlKey?'on':'off');
-        document.getElementById("temp_shift").innerHTML = (e.shiftKey?'on':'off');
-        document.getElementById("temp_meta").innerHTML = (e.metaKey?'on':'off');
-        document.getElementById("temp_alt").innerHTML = (e.altKey?'on':'off');
-        document.getElementById("temp_key").innerHTML = (e.key || e.keyCode).toString();
-      }*/
+        if (this.makingContour) {
+          // discard path
+          this.discardContour();
+        }
+        e.preventDefault();
+        return false;
+      }
       if (sx != 0 || sy != 0) {
         this.doScroll(sx*amt, sy*amt);
+        e.preventDefault();
         return false;
       }
       this.finishPainting();
     }
   }
-
-/*  this.onKeyUp = function(e) {
-      document.getElementById("temp_ctrl").innerHTML = (e.ctrlKey?'on':'off');
-      document.getElementById("temp_shift").innerHTML = (e.shiftKey?'on':'off');
-      document.getElementById("temp_meta").innerHTML = (e.metaKey?'on':'off');
-      document.getElementById("temp_alt").innerHTML = (e.altKey?'on':'off');
-      document.getElementById("temp_key").innerHTML = (e.key || e.keyCode);
-  }*/
 
   this.onMouseDown = function(e) {
     if (this.imageLoading || this.imageError || this.saving)
