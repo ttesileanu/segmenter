@@ -301,19 +301,61 @@ function Segmenter(canvas, imageName, imagePath) {
   }
 
   //// event handlers
+  this.getDeltas = function(e) {
+    var PIXEL_STEP = 10;
+    var LINE_HEIGHT = 40;
+    var PAGE_HEIGHT = 800;
+
+    // extract amount of mouse wheel motion from event, cross-browser
+    var sX = 0, sY = 0, pX = 0, pY = 0;
+
+    if ('detail'      in e) { sY = e.detail; }
+    if ('wheelDelta'  in e) { sY = -e.wheelDelta / 120; }
+    if ('wheelDeltaY' in e) { sY = -e.wheelDeltaY / 120; }
+    if ('wheelDeltaX' in e) { sX = -e.wheelDeltaX / 120; }
+
+    if ('axis' in e && e.axis == e.HORIZONTAL_AXIS) {
+      sX = sY;
+      sY = 0;
+    }
+
+    pX = sX * PIXEL_STEP;
+    pY = sY * PIXEL_STEP;
+
+    if ('deltaY' in e) { pY = e.deltaY; }
+    if ('deltaX' in e) { pX = e.deltaX; }
+
+    if ((pX || pY) && e.deltaMode) {
+      if (e.deltaMode == 1) { // delta in LINE units
+        pX *= LINE_HEIGHT;
+        pY *= LINE_HEIGHT;
+      } else {                // delta in PAGE units
+        pX *= PAGE_HEIGHT;
+        pY *= PAGE_HEIGHT;
+      }
+    }
+
+    if (pX && !sX) { sX = (pX < 1) ? -1 : 1; }
+    if (pY && !sY) { sY = (pY < 1) ? -1 : 1; }
+
+    return {spinX: sX, spinY: sY,
+            pixelX: pX, pixelY: pY};
+  }
+
   this.onWheel = function(e) {
     // handle mouse wheel & pinch gesture events
     if (!this.imageLoading && !this.imageError && !this.saving) {
       e.preventDefault();
+      movement = this.getDeltas(e);
       if (e.ctrlKey) {
         // pinch gesture -- zoom around mouse position
         var center = this.extractMousePosition(e);
         this.setMouse(center);
         if (this.isInImage(center))
-          this.doZoom(Math.exp(e.wheelDelta/4000.0), center);
+          this.doZoom(Math.exp(-movement.pixelY/200.0), center);
       } else {
         // scroll
-        this.doScroll(e.wheelDeltaX, e.wheelDeltaY);
+        this.doScroll(-movement.pixelX, -movement.pixelY);
       }
       return false;
     }
@@ -1906,6 +1948,7 @@ function Segmenter(canvas, imageName, imagePath) {
 
 //  document.addEventListener("click", function() { canvas.focus(); }, false);
 
+  canvas.addEventListener("DOMMouseScroll", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("wheel", function(e) { return s.onWheel(e); }, false);
   canvas.addEventListener("mousedown", function(e) { return s.onMouseDown(e); }, false);
   canvas.addEventListener("mouseup", function(e) { return s.onMouseUp(e); }, false);
