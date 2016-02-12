@@ -78,7 +78,7 @@ def save_file():
 
         seg_list = np.zeros(width*height, dtype='int8')
         k = 0;
-        for i in xrange(0, len(seg_rle), 2):
+        for i in range(0, len(seg_rle), 2):
           count = seg_rle[i]
           x = seg_rle[i+1]
           seg_list[k:k+count] = x
