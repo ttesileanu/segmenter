@@ -6,6 +6,7 @@ import flask
 import base64
 import json
 import time
+import re
 
 import numpy as np
 from scipy.io import savemat
@@ -92,12 +93,17 @@ def save_file():
 
     return ('', 204)
 
+def webifyPath(path):
+  # replace path separators by slashes
+  # XXX this is a hack, but it should work for Windows and *nixes
+  return re.sub(os.sep, '/', path)
+
 @app.route('/segment/<path:path>')
 def segment(path):
   full_path = os.path.join(base_path, path)
   return render_template('action.html', selected_menu='/',
       image="/serveimage/" + path, image_name=os.path.basename(path),
-      image_path=full_path)
+      image_path=webifyPath(full_path))
 
 @app.route('/serveimage/<path:path>')
 def serve_image(path):
