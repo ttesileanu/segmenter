@@ -349,7 +349,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.onKeyPress = function(e) {
     // handle key presses
     if (!this.imageLoading && !this.imageError && !this.saving) {
-      key = String.fromCharCode(e.keyCode);
+      key = e.key || String.fromCharCode(e.keyCode);
       // handle zooming
       if (key == '=' || key == '+') {
         // zoom in
