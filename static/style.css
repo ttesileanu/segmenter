@@ -535,6 +535,7 @@ input.tag
 {
   position: absolute;
   visibility: hidden;
+  left: 40px;
   bottom: 6px;
 }
 
