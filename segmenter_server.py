@@ -143,6 +143,8 @@ def getFolderContents(path):
     if os.path.isdir(abs_name):
       folders.append(crt_file)
     else:
+      # XXX a hack for Windows
+      crt_file.path = webifyPath(crt_file.path)
       files.append(crt_file)
 
   class FolderContents(object):
