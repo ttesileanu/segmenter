@@ -96,7 +96,7 @@ def save_file():
 def webifyPath(path):
   # replace path separators by slashes
   # XXX this is a hack, but it should work for Windows and *nixes
-  return re.sub(os.sep, '/', path)
+  return re.sub(r'\\', '/', path)
 
 @app.route('/segment/<path:path>')
 def segment(path):
