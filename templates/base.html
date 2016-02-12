@@ -2,8 +2,20 @@
 <html>
 
 <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Image segmenter">
+  <meta name="author" content="Tiberiu Tesileanu">
   <title>Image segmenter</title>
+
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css')  }}" />
+  <!-- favicon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-32x32.png') }}" sizes="32x32" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-192x192.png') }}" sizes="192x192" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-194x194.png') }}" sizes="194x194" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon-256x256.png') }}" sizes="256x256" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}" />
   {% block headextra %}{% endblock %}
 </head>
 
