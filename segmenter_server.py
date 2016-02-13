@@ -7,6 +7,7 @@ import base64
 import json
 import time
 import re
+import sys
 
 import numpy as np
 from scipy.io import savemat
@@ -168,4 +169,7 @@ def has_hidden_attribute(filepath):
     return result
 
 if __name__ == '__main__':
-  app.run()
+  params = {}
+  if len(sys.argv) > 1 and sys.argv[1] == '--broadcast':
+    params['host'] = '0.0.0.0'
+  app.run(**params)

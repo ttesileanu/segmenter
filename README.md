@@ -6,36 +6,40 @@ This was created as part of a joint theoretical neuroscience research project be
 
 ## Requirements
 
-The app has two components: a server component written in Python using Flask, and a client component written in Javascript and making light use of jQuery (for Ajax). For now the app has only be tested locally, in a setting in which both client and server run on the same computer. It should be straightforward to get to work on two different machines, but not much thought has been put into security.
+The app has two components: a server component written in Python using Flask, and a client component written in Javascript and making light use of jQuery (for Ajax). For now the app has only been tested locally, in a setting in which both client and server run on the same computer. It should be straightforward to get to work on two different machines, but not much thought has been put into security issues.
 
 Python requirements:
-  - version 2.x, at least 2.6
+  - version 2.x (>= 2.6) or 3.x
   - NumPy + SciPy
   - Flask
 
 Browser requirements:
-  - tested on Chrome 48 and Safari 9
+  - tested on Chrome 48, Safari 9, Firefox 44 on Mac, Windows, Linux (a few features don't work on all browsers)
 
-The app generates 5-6 full-size canvases, so if working on large images, the memory needs can be quite large (for an 18MP image, *each* of the canvases takes up over 70MB of memory). Undo levels are stored uncompressed, but only for the rectangular portion of the image that was modified. 
+The app generates 5-6 full-size canvases, so if working on large images, the memory requirements can be quite large (for an 18MP image, *each* of the canvases takes up about 70MB of memory). Undo levels are stored uncompressed, but only for the rectangular portion of image that was modified. 
 
 ## Installation
 
-Assuming you have a running installation of Python
-  * get Flask (http://flask.pocoo.org/ or `pip install Flask`),
-  * Numpy (http://www.numpy.org/ or `pip install numpy`), and
-  * Scipy (http://www.scipy.org/ or `pip install scipy`).
+You first need to get Python, Flask, NumPy, and SciPy. The easiest way to do this is to install a distribution such as Anaconda (https://www.continuum.io/downloads) or WinPython (http://winpython.github.io). Other options can be found for example at http://www.scipy.org/install.html. (If Flask doesn't come with your distribution, it is easy to install using `pip install Flask` or `pip install Flask3` from a command line, depending on whether you're using Python 2.x or 3.x). See more platform-specific instructions below.
 
-Then you can just start the server by running the `segmenter_sever.py` script. The app can be accessed at http://localhost:5000/.
+You can then just start the server by running the `segmenter_sever.py` script. The app can be accessed at http://localhost:5000/.
+
+## Installation on Mac
+
+The advantage of installing a distribution such as Anaconda is that it's straightforward and you get a complete Python development environment, including several GUIs and lots of packages. The disadvantage is that all of this takes a lot of space (1-2GB), which might not be what you want if you're only using Python for running the image segmenter.
+
+An alternative is to install one of the package managers available for the Mac, such as Homebrew (http://brew.sh/) or Macports (https://www.macports.org/). With these you can easily install all the packages you need without all the bells and whistles of a full distribution.
 
 ## Installation on Windows
 
-For Windows, installation of Python and the required Python packages is non-trivial, particularly because of NumPy and SciPy. There are two basic approaches:
-  * Using a 'meta-package' such as Anaconda (https://www.continuum.io/downloads) or WinPython (http://winpython.github.io/). Other options can be found at http://www.scipy.org/install.html. These are easy to install and come pre-packaged with NumPy and SciPy and many other goodies. They are a good choice if you know you may be using Python for other purposes as well. The downside is that these distributions are large (1-2GB).
-  * Installing Python from https://www.python.org/downloads/, then installing NumPy from https://sourceforge.net/projects/numpy/files/NumPy/ (currently only versions 1.10.2 and earlier have Windows installers) and SciPy from https://sourceforge.net/projects/scipy/files/scipy/. Make sure to select the "Add python.exe to the Path" option when installing Python.
+For Windows, there aren't really any good package managers to use, but you can install the components one by one.
+  * Get Python from https://www.python.org/downloads/. Make sure to select the "Add python.exe to the Path" option when installing Python.
+  * Get NumPy from https://sourceforge.net/projects/numpy/files/NumPy/ (currently only versions 1.10.2 and earlier have Windows installers).
+  * Get SciPy from https://sourceforge.net/projects/scipy/files/scipy/.
 
-Regardless which option you choose, make sure to choose the Python 2.7 version (not 3.x).
+You can choose either version 2.x or 3.x of Python, but make sure you make consistent choices for all the packages.
 
-Once these are installed, you can get Flask by running a Terminal (Windows+R and type "cmd" in the window that opens), and running `pip install Flask` in it. If this complains that `pip` cannot be found, then you may need to run `pip install Flask` in the directory where your Python executables are installed. Consult the documentation to figure out where that is.
+Finally, you can get Flask by running a Terminal (Windows+R and type "cmd" in the window that opens), and running `pip install Flask` or `pip install Flask3` in it. Use the latter if you've installed Python 3.x. If this complains that `pip` cannot be found, then you may need to run the command in the directory where your Python executables are installed. Consult the documentation to figure out where that is.
 
 Having installed Python, NumPy, SciPy, and Flask, you can download and unzip the image segmenter from GitHub, and double-click the `segmenter_server` script to run the server. The webapp can be accessed from a browser at `localhost:5000`, just like on Unix machines. Note that Internet Explorer 8 or older will not work -- please upgrade to a newer version, or install another browser, such as Google Chrome or Mozilla Firefox.
 
