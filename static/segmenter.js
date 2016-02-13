@@ -108,7 +108,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.minSmoothFactor = 0.0;
   this.maxSmoothFactor = 25.0;
   this.freehand = false;
-  this.closenessThreshold = 5.0;
+  this.closenessThreshold = 3.0;
   this.saveStyle = 'matlab_rle';
   this.saving = false;
   this.hideSegmentation = false;
@@ -212,10 +212,22 @@ function Segmenter(canvas, imageName, imagePath) {
     this.mouse = m;
   }
 
+  this.normalizeMousePosition = function(e) {
+    // figure out mouse position taking into account borders
+    if (this.mouseOffset === undefined) {
+      var computedStyle = window.getComputedStyle(canvas, null);
+      var topBorder = parseInt(computedStyle.getPropertyValue("border-top-width"), 10);
+      var leftBorder = parseInt(computedStyle.getPropertyValue("border-left-width"), 10);
+      var rect = canvas.getBoundingClientRect();
+      this.mouseOffset = new Vector(rect.left + leftBorder, rect.top + topBorder);
+    }
+    return vsub(new Vector(e.clientX, e.clientY), this.mouseOffset);
+  }
+
   this.extractMousePosition = function(e) {
     // extract mouse position from event
-    var rect = canvas.getBoundingClientRect();
-    return new Vector(toDevice(e.clientX - rect.left), toDevice(e.clientY - rect.top));
+    var en = this.normalizeMousePosition(e);
+    return new Vector(toDevice(en.x), toDevice(en.y));
   }
 
   this.getImageRectOnWindow = function() {
@@ -605,6 +617,7 @@ function Segmenter(canvas, imageName, imagePath) {
       if (this.contour.length > 1) {
         if (vnorm(vsub(cm, this.contour[0])) < cthresh) {
           // have this equivalent to closing the contour
+          this.contour.pop();
           this.finishContour();
           return false;
         }
@@ -762,13 +775,13 @@ function Segmenter(canvas, imageName, imagePath) {
 
       ctx.beginPath();
       ctx.strokeStyle = '#FFF';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.5*window.devicePixelRatio;
       ctx.arc(this.mouse.x, this.mouse.y, imgSize/2, 0, 2*Math.PI);
       ctx.stroke();
 
       ctx.beginPath();
       ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1*window.devicePixelRatio;
       ctx.arc(this.mouse.x, this.mouse.y, imgSize/2, 0, 2*Math.PI);
       ctx.stroke();
     }
@@ -1169,7 +1182,7 @@ function Segmenter(canvas, imageName, imagePath) {
         else ctx.lineTo(p.x, p.y);
       }
       ctx.strokeStyle = "#FFF";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2*window.devicePixelRatio;
       ctx.stroke();
 
       if (!this.freehand && this.contour.length >= 2) {
@@ -1314,6 +1327,7 @@ function Segmenter(canvas, imageName, imagePath) {
   this.fillContour = function(ctx, contour, style) {
     // fill the contour on the given context with the given style
     // figure out the vertical bounds of the contour
+    contour = this.eliminateContourDuplicates(contour);
     var rect = this.findBoundingRect(contour);
     var min_y = rect[2];
     var max_y = rect[3];
@@ -1351,6 +1365,8 @@ function Segmenter(canvas, imageName, imagePath) {
   }
 
   this.smoothCurve = function(contour, scale, nfactor) {
+    contour = this.eliminateContourDuplicates(contour);
+
     // smooth the given polygon on the given scale
     // generate a curve with at most nfactor*(curve length)/max_dist points
     nfactor = nfactor || 10;
@@ -1448,6 +1464,23 @@ function Segmenter(canvas, imageName, imagePath) {
     this.redraw();
   }
 
+  this.eliminateContourDuplicates = function(contour) {
+    if (contour.length == 0) return [];
+    // eliminate repeated points from contour
+    var last = contour[0];
+    var res = [last];
+    var THRESHOLD2 = 1e-4;
+    for (var i = 1; i < contour.length; ++i) {
+      var crt = contour[i];
+      if (vnorm2(vsub(crt, last)) >= THRESHOLD2) {
+        res.push(crt);
+        last = crt;
+      }
+    }
+
+    return res;
+  }
+
   this.finishContour = function() {
     // finish the contour, add it to the segmentation
     if (this.contour.length > 1) {
@@ -1510,7 +1543,7 @@ function Segmenter(canvas, imageName, imagePath) {
     }
 
     // draw half circle around ending point
-    for (i = 0; i < nseg; ++i) {
+    for (i = 1; i <= nseg; ++i) {
       var angle = i*Math.PI/nseg;
       var vr = vadd(vscale(R*Math.sin(angle), vi), vscale(-R*Math.cos(angle), vj));
       contour.push(vadd(v2, vr));
