@@ -92,7 +92,7 @@ Unlimited undo and redo are possible (limits do in fact exist -- currently set t
 
 ### Saving to file
 
-Press the floppy-disk icon on the bottom-left of the canvas to save the segmentation. This can take a second or two. The name of the file where the segmentation is saved is obtained by removing the extension from the image file and adding `\_segmented` and an extension (see below) to it. This is saved in the same folder as the original image.
+Press the floppy-disk icon on the bottom-left of the canvas to save the segmentation. This can take a second or two. The name of the file where the segmentation is saved is obtained by removing the extension from the image file and adding `_segmented` and an extension (see below) to it. This is saved in the same folder as the original image.
 
 #### Matlab format
 
